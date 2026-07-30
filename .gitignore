@@ -11,6 +11,7 @@ id_rsa
 secrets.json
 config.user.toml
 .reversa/config.user.toml
+runnning.md
 
 # ==========================================
 # PASTA DE DEPENDÊNCIAS (NODE_MODULES)

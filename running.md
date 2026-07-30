@@ -1,13 +1,13 @@
-# Guia Passo a Passo: Como Executar o Sistema Tuta's Paper
+# 🚀 Guia Passo a Passo: Como Executar o Sistema Tuta's Paper
 
-> **Projeto:** Tuta's Paper — E-commerce por Categorias, Fast-Food de Bottons, Checkout Mercado Pago e Painel Admin Noturno  
-> **Arquitetura:** Conteinerizada em 3 camadas via Docker Compose com PostgreSQL persistente.
+> **Projeto:** Tuta's Paper — E-commerce por Categorias, Personalizador de Imagem, Painel Admin e WhatsApp Evolution Go  
+> **Arquitetura:** Stack totalmente conteinerizada em 4 camadas via Docker Compose (Frontend Nginx SPA, Backend Express Node.js, PostgreSQL 16 e Evolution Go em Golang).
 
 ---
 
 ## 📋 1. Pré-requisitos
 
-Para executar o sistema completo em seu computador ou servidor VPS Linux, você precisará apenas do **Docker** e do **Docker Compose** instalados:
+Para executar o sistema completo em seu computador local ou servidor VPS Linux, você precisará apenas do **Docker** e do **Docker Compose** instalados:
 
 * [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows / macOS) ou Docker Engine (Linux).
 * Verifique se o Docker está ativo executando no terminal:
@@ -18,100 +18,88 @@ Para executar o sistema completo em seu computador ou servidor VPS Linux, você 
 
 ---
 
-## 🚀 2. Como Executar via Docker Compose (Modo Recomendado)
+## 🚀 2. Como Executar via Docker Compose (Passo a Passo)
 
-Toda a aplicação (Banco de Dados PostgreSQL, API Backend e Frontend Web) foi configurada para subir unificada com um único comando.
+Toda a aplicação (Banco de Dados PostgreSQL, API Backend, Servidor Nginx SPA e o Motor Evolution Go do WhatsApp) foi configurada para subir unificada com um único comando.
 
 ### **Passo 1:** Abra o terminal na pasta raiz do projeto
 ```bash
 cd C:\ProjectsCode\sistema_tutaspaper
 ```
 
-### **Passo 2:** Inicie os contêineres em segundo plano
+### **Passo 2:** Inicie os contêineres e compile as imagens
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
-> **Nota:** Na primeira execução, o Docker irá baixar a imagem do PostgreSQL 16 Alpine, construir o backend Node.js e compilar o frontend React/Nginx. O processo leva cerca de 1 a 2 minutos.
-
-### **Passo 3:** Verifique se todos os contêineres estão rodando
+### **Passo 3:** Verifique o status dos contêineres
 ```bash
 docker compose ps
 ```
-Deverão aparecer 3 serviços com status `running` ou `healthy`:
-- `tutaspaper_postgres` (PostgreSQL 16)
-- `tutaspaper_backend` (API Express Node.js)
-- `tutaspaper_frontend` (Nginx + App React)
+
+Deverão aparecer os **4 serviços** rodando com status `running` ou `healthy`:
+* 🔵 `tutaspaper_frontend` (Nginx SPA Fallback na porta 80)
+* 🟢 `tutaspaper_backend` (API Express Node.js na porta 5000)
+* 🟣 `tutaspaper_evolution_go` (Motor WhatsApp Evolution Go em Golang na porta 8080)
+* 🐘 `tutaspaper_postgres` (Banco PostgreSQL 16 na porta 5432)
 
 ---
 
-## 🌐 3. Endereços de Acesso no Navegador
+## 🌐 3. Endereços de Acesso no Navegador (Links Diretos)
 
-Após o início dos contêineres, acesse os serviços nos seguintes URLs:
+Após o início dos contêineres, acesse os serviços diretamente nos links abaixo:
 
-| Serviço | URL de Acesso | Descrição |
+| Serviço | URL de Acesso Direto | Descrição |
 |---|---|---|
-| **E-commerce & Personalizador** | `http://localhost:80` (ou `http://localhost`) | Loja pública com vitrine por categorias e Fast-Food de bottons |
-| **API Backend REST** | `http://localhost:5000/api/health` | Endpoints da API e envio de uploads de imagens |
-| **Banco PostgreSQL** | `localhost:5432` | Banco relacional persistente via volume `postgres_data` |
+| 🛒 **E-commerce público** | [http://localhost](http://localhost) | Loja virtual por categorias com botão *"Personalize com uma imagem"* |
+| 🔐 **Painel Admin Direto** | [http://localhost/admin](http://localhost/admin) | Painel Administrativo de Controle da Empresa |
+| 📱 **Evolution Go Manager** | [http://localhost:8080/manager](http://localhost:8080/manager) | Gerenciador visual para conectar o WhatsApp via QR Code |
+| ⚙️ **API REST Backend** | `http://localhost:5000/api/config` | Endpoints REST e uploads |
+| 🐘 **Banco PostgreSQL** | `localhost:5432` | Banco relacional com volume persistente |
 
 ---
 
-## 🔑 4. Credenciais de Acesso ao Painel Admin Retaguarda
+## 🔑 4. Credenciais de Acesso ao Painel Admin
 
-Para acessar o Painel Administrativo Noturno de Gestão de Estoque, Categorias e Fila de Produção de Bottons:
+Para acessar o Painel Administrativo Retaguarda:
 
-1. Acesse o e-commerce em `http://localhost`.
-2. Clique no **ícone de Cadeado (🔒)** no canto superior direito do cabeçalho.
-3. Utilize as credenciais padrão salvas na semente do banco de dados:
+1. Acesse o link direto **`http://localhost/admin`** ou clique no **ícone de Cadeado (🔒)** no topo do e-commerce.
+2. Utilize as credenciais salvas no banco de dados:
 
 * **E-mail:** `admin@tutaspapeis.com.br`
 * **Senha:** `admin123`
 
 ---
 
-## 🧪 5. Roteiro de Teste do Fluxo Completo (Passo a Passo)
+## 💬 5. Conectando o WhatsApp no Evolution Go (Passo a Passo Anti-Ban)
 
-Para testar todas as funcionalidades do sistema como cliente e como administrador:
+Para vincular o número do WhatsApp da empresa e permitir o envio automático de pedidos e fotos prontas para prensa:
 
-### **Como Cliente (E-commerce):**
-1. **Navegar pelas Categorias:** Na tela principal, alterne entre as abas *"Bottons, Chaveiros & Ímãs"*, *"Artigos Religiosos"* e *"Materiais de Papelaria"*.
-2. **Personalizar Botton:** Clique em **"Personalizar Agora"** ou **"Fast-Food de Bottons"**.
-3. **Enviar Foto & Ajustar Recorte:** Clique em **"Enviar Foto"**, escolha uma imagem no seu computador/celular, e use o mouse para arrastar a foto e os botões de zoom (`+` / `-`) para enquadrar no círculo.
-4. **Consultar Guia de Tamanhos:** Clique no botão **"Guia de Tamanhos"** e leia a explicação comparativa de **25mm (2,5 cm)** vs **38mm (3,8 cm)**.
-5. **Escolher Diâmetro e Acabamento:** Selecione o tamanho desejado (**25mm** ou **38mm**) e o acabamento (**Alfinete**, **Chaveiro** ou **Ímã**).
-6. **Adicionar ao Carrinho & Checkout:** Defina a quantidade, clique em **"Adicionar ao Carrinho"**, preencha os dados do cliente e conclua a simulação de pagamento via **Pix** ou **Cartão Mercado Pago**.
-
-### **Como Gestor / Administrador (Painel Retaguarda):**
-1. Acesse o Painel Admin via **🔒 Acesso Admin**.
-2. Faça login com `admin@tutaspapeis.com.br` / `admin123`.
-3. Na aba **"Fila de Produção Noturna"**, visualize o pedido realizado com a foto recortada em alta definição e as especificações da prensa (ex: *10x 38mm Chaveiro*).
-4. Clique no botão **"Baixar Arte HD 300DPI"** para obter o PNG pronto para impressão.
-5. Alterne o status do pedido (*Pendente* ➔ *Iniciar Prensa* ➔ *Marcar como Pronto*).
-6. Na aba **"Gestão de Categorias"**, cadastre novas categorias para sincronização imediata no e-commerce.
+1. Acesse o **Evolution Manager** em **[http://localhost:8080/manager](http://localhost:8080/manager)** (ou clique no botão *"Abrir Evolution Manager"* na **Aba 3 (Integrações)** do Painel Admin).
+2. Na caixa de autenticação do manager, insira a Global API Key:
+   `tutas_evolution_key`
+3. Selecione a instância `tutaspaper` e clique em **"QR Code"**.
+4. Abra o WhatsApp no celular da empresa, vá em **Aparelhos Conectados ➔ Conectar um Aparelho** e escaneie o QR Code na tela.
+5. **Mecanismo Anti-Ban Ativo:** Uma vez conectado, as notificações enviadas aos clientes e administradores passam automaticamente pela **Fila FIFO em Memória**, com sinal de *"Digitando..."* (`composing`) por 2-4 segundos e pausa randômica de **5 a 15 segundos** entre cada envio.
 
 ---
 
-## 🛠️ 6. Execução Local sem Docker (Opcional para Desenvolvimento)
+## ⚙️ 6. Funcionalidades das Abas do Painel Admin (`/admin`)
 
-Se você desejar executar o projeto em modo de desenvolvimento local fora do Docker:
+O Painel Admin é organizado em **3 Abas**:
 
-### **Backend (Terminal 1):**
-```bash
-cd backend
-npm install
-npm run migrate
-npm run seed
-npm run dev
-```
+### 📅 **Aba 1: Fila de Produção Noturna**
+- Exibe todos os pedidos realizados no e-commerce.
+- Mostra Nome do Cliente, Celular com WhatsApp, a **Imagem Recortada Redonda (300DPI)** formatada para prensa, link para **Download da Arte Original** e o **Prazo Registrado** (`24 horas` ou `5 dias úteis`).
+- Permite alterar os status da prensa (*Pendente* ➔ *Iniciar Prensa* ➔ *Marcar como Pronto*).
 
-### **Frontend (Terminal 2):**
-```bash
-cd frontend
-npm install
-npm run dev
-```
-Acesse o frontend em `http://localhost:3000`.
+### 🏷️ **Aba 2: Gestão de Categorias**
+- Permite cadastrar e organizar novas categorias no e-commerce (Religiosos, Papelaria, Marcas).
+
+### ⚙️ **Aba 3: Configurações & Integrações**
+- **⚡ Modo Evento 24h:** Botão para ativar/desativar em tempo real as frases de 24h, banners chamativos e badges da loja.
+- **💳 Mercado Pago:** Campo para configurar o Access Token (`APP_USR-xxxx`).
+- **💬 Evolution API / WhatsApp:** Link direto para o Evolution Manager, URL da API (`http://localhost:8080`), API Key e Nome da Instância.
 
 ---
 
@@ -121,15 +109,19 @@ Acesse o frontend em `http://localhost:3000`.
   ```bash
   docker compose logs -f
   ```
-* **Reiniciar os serviços:**
+* **Verificar uso de CPU e Memória:**
+  ```bash
+  docker stats
+  ```
+* **Reiniciar todos os serviços:**
   ```bash
   docker compose restart
   ```
-* **Parar os contêineres preservando os dados:**
+* **Reconstruir contêineres sem cache:**
+  ```bash
+  docker compose up -d --build --force-recreate
+  ```
+* **Parar os contêineres preservando os dados do banco:**
   ```bash
   docker compose down
-  ```
-* **Parar e limpar totalmente os volumes do banco de dados:**
-  ```bash
-  docker compose down -v
   ```
