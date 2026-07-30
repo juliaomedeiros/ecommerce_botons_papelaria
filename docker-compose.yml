@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: tutaspaper_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: tutaspaper_db
+      POSTGRES_USER: tutas_admin
+      POSTGRES_PASSWORD: tutas_password_123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tutas_admin -d tutaspaper_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    container_name: tutaspaper_backend
+    restart: always
+    environment:
+      PORT: 5000
+      NODE_ENV: production
+      DATABASE_URL: postgres://tutas_admin:tutas_password_123@postgres:5432/tutaspaper_db
+      JWT_SECRET: tutaspaper_super_secret_jwt_key_2026
+      MERCADOPAGO_ACCESS_TOKEN: APP_USR-mock-token-mercadopago
+      EVOLUTION_API_URL: http://evolution-api:8080
+      EVOLUTION_API_KEY: tutas_evolution_key
+      UPLOADS_DIR: /app/uploads
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      evolution-api:
+        condition: service_started
+    volumes:
+      - uploads_data:/app/uploads
+
+  evolution-api:
+    image: evoapicloud/evolution-go:latest
+    container_name: tutaspaper_evolution_go
+    restart: always
+    environment:
+      SERVER_PORT: 8080
+      SERVER_URL: http://localhost:8080
+      AUTHENTICATION_API_KEY: tutas_evolution_key
+      DATABASE_ENABLED: "false"
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    container_name: tutaspaper_frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  uploads_data:

@@ -1,0 +1,22 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Instalar dependências nativas para a biblioteca canvas
+RUN apk add --no-cache \
+    cairo-dev \
+    pango-dev \
+    jpeg-dev \
+    giflib-dev \
+    librsvg-dev \
+    build-base \
+    python3
+
+COPY backend/package*.json ./
+RUN npm install --production
+
+COPY backend/ ./
+
+EXPOSE 5000
+
+CMD ["node", "src/server.js"]

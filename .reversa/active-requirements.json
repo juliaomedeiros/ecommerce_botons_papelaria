@@ -1,0 +1,10 @@
+{
+  "schema-version": 1,
+  "feature-dir": "_reversa_forward/001-mvp-tutaspaper",
+  "feature-id": "001",
+  "short-name": "mvp-tutaspaper",
+  "started-at": "2026-07-30T10:46:05-03:00",
+  "current-stage": "requirements",
+  "stages-completed": [],
+  "paused-features": []
+}
