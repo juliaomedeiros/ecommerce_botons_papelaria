@@ -2,6 +2,8 @@ const db = require('../database/db');
 const fs = require('fs');
 const path = require('path');
 const { createCanvas, loadImage } = require('canvas');
+const pdfService = require('../services/pdfService');
+const whatsappService = require('../services/whatsappService');
 
 const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, '../../uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -114,6 +116,29 @@ async function createOrder(req, res) {
     }
 
     await db.query('COMMIT');
+
+    // Disparo assíncrono do PDF timbrado no WhatsApp informado no checkout
+    try {
+      const pdfBuffer = await pdfService.generateOrderPdfBuffer({
+        id: orderId,
+        customer_name,
+        customer_phone,
+        checkout_phone: customer_phone,
+        total_amount: totalAmount,
+        delivery_deadline: deadline,
+        created_at: new Date(),
+        items: processedItems
+      });
+
+      whatsappService.sendPdfDocument(
+        customer_phone,
+        pdfBuffer,
+        `Pedido_TutasPaper_${orderId}.pdf`,
+        `Olá, ${customer_name}! Agradecemos a preferência. Segue em anexo o comprovante timbrado do seu pedido #${orderId.slice(-8)}.`
+      );
+    } catch (pdfErr) {
+      console.error('Aviso ao gerar/enviar PDF timbrado:', pdfErr.message);
+    }
 
     return res.status(201).json({
       message: 'Pedido realizado com sucesso!',

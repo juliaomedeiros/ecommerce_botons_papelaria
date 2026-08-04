@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Tag, Filter, Sparkles } from 'lucide-react';
+import { ShoppingCart, Tag, Filter, Sparkles, AlertCircle } from 'lucide-react';
 
-export default function Catalog({ isEventoMode, onAddToCart, onCustomizeClick }) {
+export default function Catalog({ isEventoMode, isModo24h, onAddToCart, onCustomizeClick }) {
   const [categories, setCategories] = useState([]);
   const [selectedCat, setSelectedCat] = useState('all');
   const [products, setProducts] = useState([]);
@@ -59,12 +59,23 @@ export default function Catalog({ isEventoMode, onAddToCart, onCustomizeClick })
       .finally(() => setLoading(false));
   }, []);
 
-  const filteredProducts = selectedCat === 'all'
-    ? products
-    : products.filter(p => p.category_id === selectedCat);
+  // Quando Modo 24h está ATIVADO, remover produtos customizáveis e botões de personalização
+  const visibleProducts = products.filter(p => {
+    if (isModo24h && p.is_customizable) return false;
+    if (selectedCat !== 'all' && p.category_id !== selectedCat) return false;
+    return true;
+  });
 
   return (
     <div>
+      {/* Aviso Modo 24h quando ativo */}
+      {isModo24h && (
+        <div className="bg-yellow-500/10 border border-yellow-500/30 p-3 rounded-xl mb-4 text-xs text-yellow-300 flex items-center gap-2">
+          <AlertCircle size={16} className="text-yellow-400 shrink-0" />
+          <span><strong>Modo Entrega Rápida 24h Ativo:</strong> Exibindo apenas produtos prontos do catálogo para postagem expressa em até 24h.</span>
+        </div>
+      )}
+
       {/* Navegação por Categorias */}
       <div className="tabs-nav">
         {categories.map(cat => (
@@ -80,7 +91,7 @@ export default function Catalog({ isEventoMode, onAddToCart, onCustomizeClick })
 
       {/* Grid de Produtos */}
       <div className="grid-3">
-        {filteredProducts.map(prod => (
+        {visibleProducts.map(prod => (
           <div key={prod.id} className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div>
               <div style={{
@@ -101,16 +112,9 @@ export default function Catalog({ isEventoMode, onAddToCart, onCustomizeClick })
                 />
               </div>
 
-              {/* Tag condicional baseada na Flag Modo Evento (RN-05) */}
-              {isEventoMode && prod.is_customizable ? (
-                <span className="badge badge-gold" style={{ marginBottom: '8px' }}>
-                  ⚡ Personalizável em 24h
-                </span>
-              ) : (
-                <span className="badge badge-primary" style={{ marginBottom: '8px' }}>
-                  {prod.is_customizable ? 'Modelo Personalizável' : 'Pronta Entrega'}
-                </span>
-              )}
+              <span className="badge badge-primary" style={{ marginBottom: '8px' }}>
+                {prod.is_customizable ? 'Modelo Personalizável' : 'Pronta Entrega'}
+              </span>
 
               <h3 style={{ fontSize: '1.2rem', marginBottom: '8px', color: '#0f172a' }}>
                 {prod.name}
@@ -125,7 +129,7 @@ export default function Catalog({ isEventoMode, onAddToCart, onCustomizeClick })
                 R$ {parseFloat(prod.base_price).toFixed(2)}
               </div>
 
-              {prod.is_customizable ? (
+              {prod.is_customizable && !isModo24h ? (
                 <button className="btn btn-primary" onClick={onCustomizeClick} style={{ width: '100%' }}>
                   <Sparkles size={16} /> Personalize com uma imagem
                 </button>

@@ -11,10 +11,18 @@ let isProcessingQueue = false;
  * @param {string} messageText 
  * @param {string} [mediaUrl] 
  */
-function sendTextMessage(phone, messageText, mediaUrl = null) {
+/**
+ * Enfileira documento PDF no WhatsApp com Proteção Anti-Ban
+ * @param {string} phone 
+ * @param {Buffer|string} pdfBuffer 
+ * @param {string} fileName 
+ * @param {string} caption 
+ */
+function sendPdfDocument(phone, pdfBuffer, fileName = 'Pedido_TutasPaper.pdf', caption = '') {
   return new Promise((resolve) => {
-    messageQueue.push({ phone, messageText, mediaUrl, resolve });
-    console.log(`📥 [WhatsApp Anti-Ban Queue] Mensagem enfileirada para ${phone}. Posição na fila: ${messageQueue.length}`);
+    const base64Media = Buffer.isBuffer(pdfBuffer) ? `data:application/pdf;base64,${pdfBuffer.toString('base64')}` : pdfBuffer;
+    messageQueue.push({ phone, messageText: caption, mediaUrl: base64Media, fileName, isDocument: true, resolve });
+    console.log(`📥 [WhatsApp Anti-Ban Queue] PDF timbrado enfileirado para ${phone}. Posição na fila: ${messageQueue.length}`);
     processQueue();
   });
 }
@@ -24,7 +32,7 @@ async function processQueue() {
   isProcessingQueue = true;
 
   const currentItem = messageQueue.shift();
-  const { phone, messageText, mediaUrl, resolve } = currentItem;
+  const { phone, messageText, mediaUrl, fileName, isDocument, resolve } = currentItem;
   const formattedPhone = phone.replace(/\D/g, '');
 
   console.log(`⚙️ [WhatsApp Anti-Ban Engine] Processando mensagem para ${formattedPhone}...`);
@@ -46,18 +54,29 @@ async function processQueue() {
     // 2. Disparo da Mensagem via Evolution API v2
     let responseData = { success: true };
     if (process.env.NODE_ENV !== 'production' || !process.env.EVOLUTION_API_URL) {
-      console.log(`📱 Simulação WhatsApp enviado para ${formattedPhone}: "${messageText.substring(0, 60)}..."`);
+      console.log(`📱 Simulação WhatsApp enviado para ${formattedPhone}: "${(messageText || '').substring(0, 60)}..."`);
     } else {
-      const endpoint = mediaUrl ? `${EVOLUTION_API_URL}/message/sendMedia/tutaspaper` : `${EVOLUTION_API_URL}/message/sendText/tutaspaper`;
-      const bodyPayload = mediaUrl ? {
-        number: formattedPhone,
-        media: mediaUrl,
-        mediatype: 'image',
-        caption: messageText
-      } : {
-        number: formattedPhone,
-        text: messageText
-      };
+      let endpoint = `${EVOLUTION_API_URL}/message/sendText/tutaspaper`;
+      let bodyPayload = { number: formattedPhone, text: messageText };
+
+      if (isDocument) {
+        endpoint = `${EVOLUTION_API_URL}/message/sendMedia/tutaspaper`;
+        bodyPayload = {
+          number: formattedPhone,
+          media: mediaUrl,
+          mediatype: 'document',
+          fileName: fileName || 'Pedido_TutasPaper.pdf',
+          caption: messageText
+        };
+      } else if (mediaUrl) {
+        endpoint = `${EVOLUTION_API_URL}/message/sendMedia/tutaspaper`;
+        bodyPayload = {
+          number: formattedPhone,
+          media: mediaUrl,
+          mediatype: 'image',
+          caption: messageText
+        };
+      }
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -88,5 +107,6 @@ async function processQueue() {
 }
 
 module.exports = {
-  sendTextMessage
+  sendTextMessage,
+  sendPdfDocument
 };

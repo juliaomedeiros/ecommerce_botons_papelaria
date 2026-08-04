@@ -23,7 +23,7 @@ async function login(req, res) {
     }
 
     const token = jwt.sign(
-      { id: user.id, name: user.name, email: user.email },
+      { id: user.id, name: user.name, email: user.email, role: user.role || 'funcionario' },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -31,7 +31,7 @@ async function login(req, res) {
     return res.json({
       message: 'Login realizado com sucesso!',
       token,
-      user: { id: user.id, name: user.name, email: user.email }
+      user: { id: user.id, name: user.name, email: user.email, role: user.role || 'funcionario' }
     });
   } catch (error) {
     console.error('Erro no login:', error);

@@ -6,15 +6,16 @@ services:
     container_name: tutaspaper_postgres
     restart: always
     environment:
-      POSTGRES_DB: tutaspaper_db
-      POSTGRES_USER: tutas_admin
-      POSTGRES_PASSWORD: tutas_password_123
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tutas_admin -d tutaspaper_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -26,16 +27,16 @@ services:
     container_name: tutaspaper_backend
     restart: always
     environment:
-      PORT: 5000
-      NODE_ENV: production
-      DATABASE_URL: postgres://tutas_admin:tutas_password_123@postgres:5432/tutaspaper_db
-      JWT_SECRET: tutaspaper_super_secret_jwt_key_2026
-      MERCADOPAGO_ACCESS_TOKEN: APP_USR-mock-token-mercadopago
-      EVOLUTION_API_URL: http://evolution-api:8080
-      EVOLUTION_API_KEY: tutas_evolution_key
+      PORT: ${BACKEND_PORT:-5000}
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET}
+      MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN}
+      EVOLUTION_API_URL: http://evolution-api:${EVOLUTION_SERVER_PORT:-8080}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
       UPLOADS_DIR: /app/uploads
     ports:
-      - "5000:5000"
+      - "${BACKEND_PORT:-5000}:5000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -49,12 +50,18 @@ services:
     container_name: tutaspaper_evolution_go
     restart: always
     environment:
-      SERVER_PORT: 8080
-      SERVER_URL: http://localhost:8080
-      AUTHENTICATION_API_KEY: tutas_evolution_key
-      DATABASE_ENABLED: "false"
+      SERVER_PORT: ${EVOLUTION_SERVER_PORT:-8080}
+      SERVER_URL: ${EVOLUTION_API_URL:-http://localhost:8080}
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      GLOBAL_API_KEY: ${EVOLUTION_API_KEY}
+      POSTGRES_AUTH_DB: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/evogo_auth?sslmode=disable
+      POSTGRES_USERS_DB: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/evogo_users?sslmode=disable
+      DATABASE_SAVE_MESSAGES: "true"
     ports:
-      - "8080:8080"
+      - "${EVOLUTION_SERVER_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   frontend:
     build:

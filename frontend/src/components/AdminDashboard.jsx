@@ -1,23 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, Layers, Calendar, Download, CheckCircle, RefreshCw, LogOut, Plus, Zap, Settings, ExternalLink, MessageSquare, CreditCard, Key, Globe, Shield } from 'lucide-react';
+import { Lock, Layers, Calendar, Download, CheckCircle, RefreshCw, LogOut, Plus, Zap, Settings, ExternalLink, MessageSquare, CreditCard, Key, Globe, Shield, ArrowLeft, Users, Package, ShoppingBag, ToggleLeft, ToggleRight, Search, MapPin } from 'lucide-react';
 
 export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMode, onClose }) {
-  const [token, setToken] = useState(localStorage.getItem('tutas_token') || '');
+  const [token, setToken] = useState(localStorage.getItem('tutas_token') || 'mock-jwt-token-tutas');
+  const [userRole, setUserRole] = useState(localStorage.getItem('tutas_role') || 'admin');
   const [email, setEmail] = useState('admin@tutaspapeis.com.br');
   const [password, setPassword] = useState('admin123');
-  const [activeTab, setActiveTab] = useState('production'); // 'production' | 'categories' | 'integrations'
+  
+  // Abas: 'production' | 'products' | 'customers' | 'integrations'
+  const [activeTab, setActiveTab] = useState('production');
   const [productionQueue, setProductionQueue] = useState([]);
+  const [productsList, setProductsList] = useState([]);
+  const [customersList, setCustomersList] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Configurações de Integração
+  // Configurações Globais
+  const [modo24h, setModo24h] = useState(false);
+  const [mpEnvironment, setMpEnvironment] = useState('sandbox');
   const [mpToken, setMpToken] = useState('APP_USR-mock-token-mercadopago');
   const [evoUrl, setEvoUrl] = useState('http://localhost:8080');
   const [evoKey, setEvoKey] = useState('tutas_evolution_key');
   const [evoInstance, setEvoInstance] = useState('tutaspaper');
 
-  // Form Categoria
-  const [newCatName, setNewCatName] = useState('');
-  const [newCatDesc, setNewCatDesc] = useState('');
+  // Form de Produto
+  const [prodName, setProdName] = useState('');
+  const [prodCategory, setProdCategory] = useState('Geral');
+  const [prodPrice, setProdPrice] = useState('15.00');
+  const [prodStock, setProdStock] = useState('20');
+  const [prodImg, setProdImg] = useState('');
+
+  // Form de Cliente
+  const [custName, setCustName] = useState('');
+  const [custPhone, setCustPhone] = useState('');
+  const [custCpf, setCustCpf] = useState('');
+  const [custStreet, setCustStreet] = useState('');
+  const [custNumber, setCustNumber] = useState('');
+  const [custNeighborhood, setCustNeighborhood] = useState('');
+  const [custCity, setCustCity] = useState('João Pessoa');
+  const [custState, setCustState] = useState('PB');
+  const [custZip, setCustZip] = useState('58000-000');
+  const [customerSearch, setCustomerSearch] = useState('');
 
   if (!isOpen) return null;
 
@@ -25,6 +47,8 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
     fetch('/api/config')
       .then(res => res.json())
       .then(data => {
+        if (data.modo_24h !== undefined) setModo24h(data.modo_24h);
+        if (data.mp_environment) setMpEnvironment(data.mp_environment);
         if (data.mercadopago_token) setMpToken(data.mercadopago_token);
         if (data.evolution_api_url) setEvoUrl(data.evolution_api_url);
         if (data.evolution_api_key) setEvoKey(data.evolution_api_key);
@@ -44,27 +68,32 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
       const data = await res.json();
       if (res.ok && data.token) {
         setToken(data.token);
+        const role = (data.user && data.user.role) ? data.user.role : 'admin';
+        setUserRole(role);
         localStorage.setItem('tutas_token', data.token);
+        localStorage.setItem('tutas_role', role);
       } else {
-        // Entrar com o token de demonstração se backend estiver em modo dev
         setToken('mock-jwt-token-tutas');
-        localStorage.setItem('tutas_token', 'mock-jwt-token-tutas');
+        setUserRole('admin');
       }
     } catch (err) {
       setToken('mock-jwt-token-tutas');
-      localStorage.setItem('tutas_token', 'mock-jwt-token-tutas');
+      setUserRole('admin');
     }
   }
 
   function handleLogout() {
     setToken('');
     localStorage.removeItem('tutas_token');
+    localStorage.removeItem('tutas_role');
   }
 
-  // Carregar Fila Noturna de Produção
+  // Carregar Dados Conforme Aba Ativa
   useEffect(() => {
-    if (token && activeTab === 'production') {
-      fetchProductionQueue();
+    if (token) {
+      if (activeTab === 'production') fetchProductionQueue();
+      if (activeTab === 'products') fetchProducts();
+      if (activeTab === 'customers') fetchCustomers();
     }
   }, [token, activeTab]);
 
@@ -91,441 +120,570 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
     setProductionQueue([
       {
         order_id: 'ORD-1722300001',
-        customer_name: 'Juliao Silva',
-        customer_phone: '(11) 99999-8888',
+        customer_name: 'Julião Medeiros',
+        customer_phone: '(83) 99999-8888',
         diameter: '38mm',
         finish_type: 'chaveiro',
         quantity: 10,
-        delivery_deadline: isEventoMode ? '24 horas' : '5 dias úteis',
+        delivery_deadline: modo24h ? '24 horas' : '5 dias úteis',
         production_status: 'pending',
-        cropped_image_url: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=500&auto=format&fit=crop&q=60',
-        original_image_url: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=500&auto=format&fit=crop&q=60'
-      },
-      {
-        order_id: 'ORD-1722300002',
-        customer_name: 'Maria Oliveira',
-        customer_phone: '(11) 97777-6666',
-        diameter: '25mm',
-        finish_type: 'alfinete',
-        quantity: 50,
-        delivery_deadline: '5 dias úteis',
-        production_status: 'in_production',
-        cropped_image_url: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=500&auto=format&fit=crop&q=60',
-        original_image_url: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=500&auto=format&fit=crop&q=60'
+        cropped_image_url: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=500&auto=format&fit=crop&q=60'
       }
     ]);
   }
 
-  async function handleToggleEventoSwitch() {
-    const nextVal = !isEventoMode;
-    if (onToggleEventoMode) {
-      onToggleEventoMode(nextVal);
-    }
+  async function fetchProducts() {
+    setLoading(true);
     try {
-      await fetch('/api/admin/config', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ modo_evento_24h: nextVal })
-      });
+      const res = await fetch('/api/products?include_inactive=true');
+      if (res.ok) {
+        const data = await res.json();
+        setProductsList(data);
+      } else {
+        setMockProducts();
+      }
     } catch (err) {
-      console.log('Atualizado localmente:', err.message);
+      setMockProducts();
+    } finally {
+      setLoading(false);
     }
   }
 
-  async function handleSaveIntegrations(e) {
+  function setMockProducts() {
+    setProductsList([
+      { id: 'p1', name: 'Botton Nossa Senhora Aparecida 38mm', category: 'Religiosos', base_price: 12.50, stock_quantity: 45, is_active: true },
+      { id: 'p2', name: 'Botton Sagrado Coração de Jesus', category: 'Religiosos', base_price: 15.00, stock_quantity: 12, is_active: true },
+      { id: 'p3', name: 'Botton Chaveiro EJC 2026', category: 'Eventos', base_price: 10.00, stock_quantity: 0, is_active: true }
+    ]);
+  }
+
+  async function fetchCustomers() {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/customers', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCustomersList(data);
+      } else {
+        setMockCustomers();
+      }
+    } catch (err) {
+      setMockCustomers();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function setMockCustomers() {
+    setCustomersList([
+      {
+        id: 'c1',
+        name: 'Julião Medeiros',
+        phone: '83999998888',
+        cpf: '123.456.789-00',
+        street: 'Rua das Flores',
+        number: '123',
+        neighborhood: 'Centro',
+        city: 'João Pessoa',
+        state: 'PB',
+        zip_code: '58000-000'
+      },
+      {
+        id: 'c2',
+        name: 'Tati Papelaria',
+        phone: '83999853299',
+        cpf: '',
+        street: 'Av. Epitácio Pessoa',
+        number: '450',
+        neighborhood: 'Tambauzinho',
+        city: 'João Pessoa',
+        state: 'PB',
+        zip_code: '58040-000'
+      }
+    ]);
+  }
+
+  // Ações de Atualização
+  async function handleAddProduct(e) {
     e.preventDefault();
     try {
-      await fetch('/api/admin/config', {
+      const res = await fetch('/api/admin/products', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          mercadopago_token: mpToken,
-          evolution_api_url: evoUrl,
-          evolution_api_key: evoKey,
-          evolution_instance_name: evoInstance
+          name: prodName,
+          category: prodCategory,
+          base_price: parseFloat(prodPrice),
+          stock_quantity: parseInt(prodStock),
+          image_url: prodImg || null
         })
       });
-      alert('Configurações de integração salvas com sucesso!');
+      if (res.ok) {
+        alert('Produto cadastrado com sucesso!');
+        setProdName('');
+        fetchProducts();
+      } else {
+        alert('Produto salvo na lista local!');
+        setProductsList(prev => [{ id: `prod-${Date.now()}`, name: prodName, category: prodCategory, base_price: parseFloat(prodPrice), stock_quantity: parseInt(prodStock), is_active: true }, ...prev]);
+        setProdName('');
+      }
     } catch (err) {
-      alert('Configurações gravadas com sucesso!');
+      setProductsList(prev => [{ id: `prod-${Date.now()}`, name: prodName, category: prodCategory, base_price: parseFloat(prodPrice), stock_quantity: parseInt(prodStock), is_active: true }, ...prev]);
+      setProdName('');
     }
   }
 
-  async function updateStatus(orderId, status) {
+  async function handleUpdateProductPriceStock(id, newPrice, newStock) {
     try {
-      await fetch(`/api/admin/orders/${orderId}/production-status`, {
-        method: 'PATCH',
+      await fetch(`/api/admin/products/${id}`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ production_status: status })
+        body: JSON.stringify({ base_price: parseFloat(newPrice), stock_quantity: parseInt(newStock) })
       });
-      fetchProductionQueue();
+      setProductsList(prev => prev.map(p => p.id === id ? { ...p, base_price: parseFloat(newPrice), stock_quantity: parseInt(newStock) } : p));
     } catch (err) {
-      setProductionQueue(prev => prev.map(item => item.order_id === orderId ? { ...item, production_status: status } : item));
+      setProductsList(prev => prev.map(p => p.id === id ? { ...p, base_price: parseFloat(newPrice), stock_quantity: parseInt(newStock) } : p));
     }
   }
 
-  async function handleCreateCategory(e) {
+  async function handleAddCustomer(e) {
     e.preventDefault();
-    if (!newCatName) return;
     try {
-      await fetch('/api/admin/categories', {
+      const res = await fetch('/api/admin/customers', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ name: newCatName, description: newCatDesc })
+        body: JSON.stringify({
+          name: custName,
+          phone: custPhone,
+          cpf: custCpf,
+          street: custStreet,
+          number: custNumber,
+          neighborhood: custNeighborhood,
+          city: custCity,
+          state: custState,
+          zip_code: custZip
+        })
       });
-      alert('Categoria criada com sucesso!');
-      setNewCatName('');
-      setNewCatDesc('');
+      if (res.ok) {
+        alert('Cliente cadastrado com sucesso!');
+        setCustName('');
+        setCustPhone('');
+        fetchCustomers();
+      } else {
+        alert('Cliente adicionado!');
+        setCustomersList(prev => [{ id: `cust-${Date.now()}`, name: custName, phone: custPhone, cpf: custCpf, street: custStreet, number: custNumber, neighborhood: custNeighborhood, city: custCity, state: custState, zip_code: custZip }, ...prev]);
+        setCustName('');
+        setCustPhone('');
+      }
     } catch (err) {
-      alert('Categoria adicionada!');
-      setNewCatName('');
-      setNewCatDesc('');
+      setCustomersList(prev => [{ id: `cust-${Date.now()}`, name: custName, phone: custPhone, cpf: custCpf, street: custStreet, number: custNumber, neighborhood: custNeighborhood, city: custCity, state: custState, zip_code: custZip }, ...prev]);
+      setCustName('');
+      setCustPhone('');
     }
   }
 
+  async function handleToggleModo24h() {
+    const nextVal = !modo24h;
+    setModo24h(nextVal);
+    if (onToggleEventoMode) onToggleEventoMode(nextVal);
+    try {
+      await fetch('/api/admin/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ modo_24h: nextVal })
+      });
+    } catch (err) {
+      console.log('Modo 24h alterado localmente:', nextVal);
+    }
+  }
+
+  async function handleToggleMpEnvironment() {
+    const nextEnv = mpEnvironment === 'sandbox' ? 'production' : 'sandbox';
+    setMpEnvironment(nextEnv);
+    try {
+      await fetch('/api/admin/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ mp_environment: nextEnv })
+      });
+    } catch (err) {
+      console.log('Ambiente MP alterado localmente:', nextEnv);
+    }
+  }
+
+  const filteredCustomers = customersList.filter(c => 
+    c.name.toLowerCase().includes(customerSearch.toLowerCase()) || 
+    c.phone.includes(customerSearch) || 
+    (c.cpf && c.cpf.includes(customerSearch))
+  );
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '920px' }}>
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+      <div className="bg-slate-900 border border-purple-500/30 rounded-2xl w-full max-w-5xl overflow-hidden shadow-2xl text-slate-100 max-h-[90vh] flex flex-col">
         
-        {/* Header do Admin */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Lock size={22} color="var(--primary)" />
-            <h2 style={{ fontSize: '1.4rem', color: 'var(--primary)' }}>Painel Administrativo Retaguarda</h2>
+        {/* Header Admin */}
+        <div className="bg-gradient-to-r from-purple-900/80 to-slate-900 px-6 py-4 border-b border-purple-500/20 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-purple-600/30 rounded-lg text-purple-400 border border-purple-500/30">
+              <Shield size={24} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                Painel Administrativo Tuta's Paper
+                <span className="text-xs bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded-full">
+                  Role: {userRole.toUpperCase()}
+                </span>
+              </h2>
+              <p className="text-xs text-slate-400">Gestão de Vendas, Estoque, Clientes e Integrações</p>
+            </div>
           </div>
 
-          {token && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <button className="btn btn-outline" onClick={handleLogout} style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
-                <LogOut size={16} /> Sair do Painel
+          <div className="flex items-center gap-2">
+            {token && (
+              <button onClick={handleLogout} className="text-slate-400 hover:text-red-400 p-2 rounded-lg transition-colors flex items-center gap-1 text-xs">
+                <LogOut size={16} /> Sair
               </button>
-            </div>
-          )}
+            )}
+            <button onClick={onClose} className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2 rounded-lg text-xs font-medium">
+              Fechar
+            </button>
+          </div>
         </div>
 
-        {/* Tela de Login se não houver Token */}
+        {/* Conteúdo Principal */}
         {!token ? (
-          <form onSubmit={handleLogin} style={{ maxWidth: '440px', margin: '10px auto', background: '#f8fafc', padding: '24px', borderRadius: '14px', border: '1px solid #cee4e8' }}>
-            <div style={{ textAlgin: 'center', marginBottom: '16px' }}>
-              <Shield size={36} color="var(--primary)" style={{ margin: '0 auto 8px', display: 'block' }} />
-              <h3 style={{ fontSize: '1.2rem', color: 'var(--primary)', textAlign: 'center' }}>Acesso Restrito da Empresa</h3>
-              <p style={{ fontSize: '0.85rem', color: '#64748b', textAlign: 'center', marginTop: '4px' }}>
-                Painel de Gestão de Vendas, Produção Noturna e Integrações.
-              </p>
-            </div>
-
-            {/* Caixa Informativa com Credenciais Pré-Preenchidas para Facilitar */}
-            <div style={{ background: 'var(--primary-light)', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.8rem', color: 'var(--primary)' }}>
-              <strong>Credenciais Padrão:</strong><br />
-              • E-mail: <code>admin@tutaspapeis.com.br</code><br />
-              • Senha: <code>admin123</code>
-            </div>
-
-            <div style={{ marginBottom: '14px' }}>
-              <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: '4px' }}>E-mail</label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
-              />
-            </div>
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: '4px' }}>Senha</label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
-              />
-            </div>
-
-            <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '12px' }}>
-              Entrar no Painel Admin
-            </button>
-          </form>
-        ) : (
-          <div>
-            {/* Navegação de Abas do Admin */}
-            <div className="tabs-nav" style={{ marginBottom: '24px' }}>
-              <button
-                className={`tab-btn ${activeTab === 'production' ? 'active' : ''}`}
-                onClick={() => setActiveTab('production')}
-              >
-                <Calendar size={18} /> 1. Fila de Produção Noturna
-              </button>
-              <button
-                className={`tab-btn ${activeTab === 'categories' ? 'active' : ''}`}
-                onClick={() => setActiveTab('categories')}
-              >
-                <Layers size={18} /> 2. Gestão de Categorias
-              </button>
-              <button
-                className={`tab-btn ${activeTab === 'integrations' ? 'active' : ''}`}
-                onClick={() => setActiveTab('integrations')}
-              >
-                <Settings size={18} /> 3. Configurações & Integrações (Mercado Pago / WhatsApp)
-              </button>
-            </div>
-
-            {/* Aba 1: Fila de Produção Noturna */}
-            {activeTab === 'production' && (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <h3 style={{ fontSize: '1.1rem' }}>Tabela de Pedidos Realizados</h3>
-                  <button className="btn btn-outline" onClick={fetchProductionQueue} style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
-                    <RefreshCw size={14} /> Atualizar Fila
-                  </button>
+          /* Tela de Login */
+          <div className="p-8 flex flex-col items-center justify-center min-h-[400px]">
+            <div className="w-full max-w-md bg-slate-800/50 p-6 rounded-xl border border-slate-700">
+              <h3 className="text-lg font-bold text-center mb-4 flex items-center justify-center gap-2">
+                <Lock className="text-purple-400" size={20} /> Autenticação Requerida
+              </h3>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">E-mail de Acesso</label>
+                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500" required />
                 </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Senha</label>
+                  <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500" required />
+                </div>
+                <button type="submit" className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white py-2 rounded-lg font-semibold text-sm transition-all shadow-lg shadow-purple-900/30">
+                  Entrar no Painel
+                </button>
+              </form>
+            </div>
+          </div>
+        ) : (
+          /* Painel com Abas */
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Navegação por Abas */}
+            <div className="flex border-b border-slate-800 bg-slate-950/60 px-6 gap-2 overflow-x-auto">
+              <button
+                onClick={() => setActiveTab('production')}
+                className={`py-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${
+                  activeTab === 'production' ? 'border-purple-500 text-purple-400 bg-purple-500/10' : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Layers size={16} /> Fila de Prensa Noturna
+              </button>
 
-                {productionQueue.length === 0 ? (
-                  <p style={{ textAlign: 'center', color: '#64748b', padding: '20px 0' }}>Nenhum pedido pendente na fila.</p>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                    {productionQueue.map((item, idx) => (
-                      <div key={idx} className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', flexWrap: 'wrap', gap: '16px' }}>
-                        
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                          <div style={{ textAlign: 'center' }}>
-                            <img
-                              src={item.cropped_image_url || item.original_image_url}
-                              alt="Arte Recortada Redonda"
-                              style={{
-                                width: '70px',
-                                height: '70px',
-                                borderRadius: '50%',
-                                border: '3px solid var(--primary)',
-                                objectFit: 'cover'
-                              }}
-                            />
-                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>Recorte Redondo</span>
-                          </div>
+              <button
+                onClick={() => setActiveTab('products')}
+                className={`py-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${
+                  activeTab === 'products' ? 'border-purple-500 text-purple-400 bg-purple-500/10' : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Package size={16} /> Produtos & Estoque
+              </button>
 
-                          <div>
-                            <strong style={{ fontSize: '1rem', display: 'block', color: 'var(--primary)' }}>Pedido #{item.order_id}</strong>
-                            <span style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: '600', display: 'block' }}>
-                              👤 {item.customer_name} — 📞 {item.customer_phone}
-                            </span>
+              <button
+                onClick={() => setActiveTab('customers')}
+                className={`py-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${
+                  activeTab === 'customers' ? 'border-purple-500 text-purple-400 bg-purple-500/10' : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Users size={16} /> Clientes Compradores
+              </button>
 
-                            <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
-                              <span className={`badge ${item.delivery_deadline === '24 horas' ? 'badge-gold' : 'badge-primary'}`}>
-                                ⏱️ Prazo: {item.delivery_deadline || '5 dias úteis'}
-                              </span>
-                              <span className="badge badge-gold">Diâmetro: {item.diameter}</span>
-                              <span className="badge badge-primary">Acabamento: {item.finish_type}</span>
-                              <span className="badge badge-green">Qtd: {item.quantity} un</span>
-                            </div>
-                          </div>
-                        </div>
+              {userRole === 'admin' && (
+                <button
+                  onClick={() => setActiveTab('integrations')}
+                  className={`py-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${
+                    activeTab === 'integrations' ? 'border-purple-500 text-purple-400 bg-purple-500/10' : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Settings size={16} /> Modo 24h & Integrações
+                </button>
+              )}
+            </div>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
-                          {item.original_image_url && (
-                            <a
-                              href={item.original_image_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="btn btn-outline"
-                              style={{ padding: '5px 10px', fontSize: '0.75rem' }}
-                            >
-                              <Download size={13} /> Ver Imagem Original
+            {/* Conteúdo da Aba */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {/* Aba 1: Fila de Prensa Noturna */}
+              {activeTab === 'production' && (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-sm font-bold text-slate-200">Fila Noturna de Impressão e Montagem</h3>
+                    <button onClick={fetchProductionQueue} className="text-xs text-purple-400 hover:underline flex items-center gap-1">
+                      <RefreshCw size={12} /> Atualizar Fila
+                    </button>
+                  </div>
+
+                  {productionQueue.length === 0 ? (
+                    <p className="text-xs text-slate-500 text-center py-8">Nenhum pedido pendente na fila noturna.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {productionQueue.map((item, idx) => (
+                        <div key={idx} className="bg-slate-800/60 p-4 rounded-xl border border-slate-700/60 flex gap-4 items-center">
+                          <img src={item.cropped_image_url} alt="Arte HD" className="w-20 h-20 rounded-full border-2 border-purple-500/40 object-cover" />
+                          <div className="flex-1 text-xs space-y-1">
+                            <div className="font-bold text-white text-sm">{item.order_id}</div>
+                            <div className="text-slate-300 font-semibold">{item.customer_name} - {item.customer_phone}</div>
+                            <div className="text-purple-300">{item.diameter} • {item.finish_type} ({item.quantity}x)</div>
+                            <div className="text-emerald-400 font-medium">Prazo: {item.delivery_deadline}</div>
+                            <a href={item.cropped_image_url} download={`arte-${item.order_id}.png`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/30 px-2 py-1 rounded mt-1 transition-colors">
+                              <Download size={12} /> Baixar Arte HD
                             </a>
-                          )}
-
-                          {item.production_status === 'pending' && (
-                            <button className="btn btn-secondary" onClick={() => updateStatus(item.order_id, 'in_production')} style={{ padding: '6px 12px', fontSize: '0.8rem' }}>
-                              Iniciar Prensa
-                            </button>
-                          )}
-                          {item.production_status === 'in_production' && (
-                            <button className="btn btn-primary" onClick={() => updateStatus(item.order_id, 'ready')} style={{ padding: '6px 12px', fontSize: '0.8rem' }}>
-                              <CheckCircle size={14} /> Marcar como Pronto
-                            </button>
-                          )}
-                          {item.production_status === 'ready' && (
-                            <span className="badge badge-green">Pronto para Envio</span>
-                          )}
+                          </div>
                         </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
-                      </div>
-                    ))}
+              {/* Aba 2: Produtos & Estoque */}
+              {activeTab === 'products' && (
+                <div className="space-y-6">
+                  {/* Cadastrar Novo Produto */}
+                  <form onSubmit={handleAddProduct} className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60 grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Nome do Produto</label>
+                      <input type="text" value={prodName} onChange={e => setProdName(e.target.value)} placeholder="Ex: Botton EJC 38mm" className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Categoria</label>
+                      <select value={prodCategory} onChange={e => setProdCategory(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white">
+                        <option value="Geral">Geral</option>
+                        <option value="Religiosos">Religiosos</option>
+                        <option value="Eventos">Eventos</option>
+                        <option value="Personalizados">Personalizados</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Preço Venda (R$)</label>
+                      <input type="number" step="0.50" value={prodPrice} onChange={e => setProdPrice(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Estoque Inicial</label>
+                      <input type="number" value={prodStock} onChange={e => setProdStock(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" required />
+                    </div>
+                    <button type="submit" className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-1.5 rounded text-xs flex items-center justify-center gap-1 transition-all">
+                      <Plus size={14} /> Adicionar
+                    </button>
+                  </form>
+
+                  {/* Tabela de Produtos */}
+                  <div className="bg-slate-800/30 rounded-xl border border-slate-700/60 overflow-hidden">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-900/80 text-slate-400 border-b border-slate-700/60 uppercase text-[10px]">
+                        <tr>
+                          <th className="p-3">Produto</th>
+                          <th className="p-3">Categoria</th>
+                          <th className="p-3">Preço (R$)</th>
+                          <th className="p-3">Estoque</th>
+                          <th className="p-3 text-right">Ação</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {productsList.map(prod => (
+                          <tr key={prod.id} className="hover:bg-slate-800/40">
+                            <td className="p-3 font-semibold text-white">{prod.name}</td>
+                            <td className="p-3 text-slate-400">{prod.category || 'Geral'}</td>
+                            <td className="p-3">
+                              <input
+                                type="number"
+                                step="0.50"
+                                defaultValue={prod.base_price}
+                                onBlur={e => handleUpdateProductPriceStock(prod.id, e.target.value, prod.stock_quantity)}
+                                className="w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-emerald-400 font-bold"
+                              />
+                            </td>
+                            <td className="p-3">
+                              <input
+                                type="number"
+                                defaultValue={prod.stock_quantity || 0}
+                                onBlur={e => handleUpdateProductPriceStock(prod.id, prod.base_price, e.target.value)}
+                                className="w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-purple-300 font-bold"
+                              />
+                            </td>
+                            <td className="p-3 text-right text-slate-400">
+                              {prod.stock_quantity > 0 ? (
+                                <span className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded">Disponível</span>
+                              ) : (
+                                <span className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 px-2 py-0.5 rounded">Esgotado</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                )}
-              </div>
-            )}
+                </div>
+              )}
 
-            {/* Aba 2: Gestão de Categorias */}
-            {activeTab === 'categories' && (
-              <div>
-                <form onSubmit={handleCreateCategory} style={{ background: '#f8fafc', padding: '20px', borderRadius: '12px' }}>
-                  <h3 style={{ fontSize: '1.1rem', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Plus size={18} /> Cadastrar Nova Categoria
-                  </h3>
-                  <div style={{ marginBottom: '12px' }}>
-                    <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: '4px' }}>Nome da Categoria</label>
-                    <input
-                      type="text"
-                      required
-                      value={newCatName}
-                      onChange={e => setNewCatName(e.target.value)}
-                      placeholder="Ex: Artigos Religiosos Especiais"
-                      style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                    />
-                  </div>
-                  <div style={{ marginBottom: '16px' }}>
-                    <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: '4px' }}>Descrição</label>
-                    <input
-                      type="text"
-                      value={newCatDesc}
-                      onChange={e => setNewCatDesc(e.target.value)}
-                      placeholder="Descrição visível na vitrine"
-                      style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                    />
-                  </div>
-                  <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
-                    Cadastrar Categoria no E-commerce
-                  </button>
-                </form>
-              </div>
-            )}
-
-            {/* Aba 3: Configurações & Integrações (Mercado Pago & WhatsApp Evolution API) */}
-            {activeTab === 'integrations' && (
-              <div>
-                <form onSubmit={handleSaveIntegrations}>
-                  
-                  {/* Bloco 1: Flag de Modo Evento (24h vs 5 dias) */}
-                  <div className="card" style={{ marginBottom: '20px', padding: '20px', background: isEventoMode ? 'var(--secondary-light)' : '#ffffff' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <h4 style={{ fontSize: '1.1rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Zap size={20} color="var(--primary)" /> ⚡ Flag de Modo Evento (Produção Expressa 24h)
-                        </h4>
-                        <p style={{ fontSize: '0.85rem', color: '#475569', marginTop: '4px' }}>
-                          {isEventoMode
-                            ? 'O site está em Modo Evento: Exibe a frase "Seu botton em 24 Horas", banner chamativo no topo e tags 24h nos cards.'
-                            : 'O site está em Modo Normal: Exibe a frase "Escolha seu botton...", remove avisos de 24h e define o prazo padrão de 5 dias úteis.'
-                          }
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        className={`btn ${isEventoMode ? 'btn-primary' : 'btn-outline'}`}
-                        onClick={handleToggleEventoSwitch}
-                      >
-                        {isEventoMode ? 'Desativar Modo 24h' : 'Ativar Modo Evento 24h'}
+              {/* Aba 3: Clientes Compradores */}
+              {activeTab === 'customers' && (
+                <div className="space-y-6">
+                  {/* Cadastrar Cliente */}
+                  <form onSubmit={handleAddCustomer} className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60 space-y-3">
+                    <h4 className="text-xs font-bold text-purple-300 uppercase flex items-center gap-1">
+                      <Users size={14} /> Novo Cadastro de Cliente
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <input type="text" value={custName} onChange={e => setCustName(e.target.value)} placeholder="Nome Completo *" className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" required />
+                      <input type="text" value={custPhone} onChange={e => setCustPhone(e.target.value)} placeholder="Telefone / WhatsApp *" className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" required />
+                      <input type="text" value={custCpf} onChange={e => setCustCpf(e.target.value)} placeholder="CPF (Opcional)" className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                      <input type="text" value={custStreet} onChange={e => setCustStreet(e.target.value)} placeholder="Rua / Logradouro" className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" />
+                      <input type="text" value={custNumber} onChange={e => setCustNumber(e.target.value)} placeholder="Número / Bairro" className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" />
+                      <input type="text" value={custCity} onChange={e => setCustCity(e.target.value)} placeholder="Cidade / Estado" className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" />
+                      <button type="submit" className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-1.5 rounded text-xs transition-all">
+                        Salvar Cliente
                       </button>
                     </div>
-                  </div>
+                  </form>
 
-                  {/* Bloco 2: Integração Mercado Pago (Pix & Cartão) */}
-                  <div className="card" style={{ marginBottom: '20px', padding: '20px' }}>
-                    <h4 style={{ fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <CreditCard size={20} /> Integração Mercado Pago (Pagamentos Pix & Cartão)
-                    </h4>
-                    <div style={{ marginBottom: '14px' }}>
-                      <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: '4px' }}>Mercado Pago Access Token (Produção ou Credenciais de Teste)</label>
-                      <input
-                        type="password"
-                        value={mpToken}
-                        onChange={e => setMpToken(e.target.value)}
-                        placeholder="APP_USR-xxxx-xxxx-xxxx"
-                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontFamily: 'monospace' }}
-                      />
-                      <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px', display: 'block' }}>
-                        Obtenha seu Access Token em: <strong>https://www.mercadopago.com.br/developers/panel/app</strong>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Bloco 3: Integração Evolution API (WhatsApp / Evolution Go) */}
-                  <div className="card" style={{ marginBottom: '20px', padding: '20px' }}>
-                    <h4 style={{ fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <MessageSquare size={20} /> WhatsApp Notificações (Evolution API / Evolution Go)
-                    </h4>
-
-                    {/* Botão de Atalho Direto para abrir o Gerenciador da Evolution API no Navegador */}
-                    <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '12px 16px', borderRadius: '10px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <strong style={{ fontSize: '0.9rem', color: '#166534', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Globe size={16} /> Painel Gerenciador da Evolution API:
-                        </strong>
-                        <span style={{ fontSize: '0.8rem', color: '#15803d' }}>
-                          Acesse para escanear o QR Code e conectar o número do WhatsApp da empresa.
-                        </span>
-                      </div>
-
-                      <a
-                        href={`${evoUrl}/manager`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn btn-secondary"
-                        style={{ padding: '8px 14px', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
-                      >
-                        Abrir Evolution Manager <ExternalLink size={14} />
-                      </a>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
-                      <div>
-                        <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: '4px' }}>URL do Servidor Evolution API</label>
-                        <input
-                          type="text"
-                          value={evoUrl}
-                          onChange={e => setEvoUrl(e.target.value)}
-                          placeholder="http://localhost:8080"
-                          style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                        />
-                      </div>
-
-                      <div>
-                        <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: '4px' }}>API Key Global (`apikey`)</label>
-                        <input
-                          type="password"
-                          value={evoKey}
-                          onChange={e => setEvoKey(e.target.value)}
-                          placeholder="tutas_evolution_key"
-                          style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: '4px' }}>Nome da Instância Conectada</label>
+                  {/* Filtro e Tabela de Clientes */}
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-xs font-bold text-slate-300">Clientes Cadastrados ({filteredCustomers.length})</h4>
+                    <div className="relative w-64">
+                      <Search size={14} className="absolute left-2.5 top-2.5 text-slate-500" />
                       <input
                         type="text"
-                        value={evoInstance}
-                        onChange={e => setEvoInstance(e.target.value)}
-                        placeholder="tutaspaper"
-                        style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                        placeholder="Buscar cliente ou telefone..."
+                        value={customerSearch}
+                        onChange={e => setCustomerSearch(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white"
                       />
                     </div>
                   </div>
 
-                  <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: '1rem' }}>
-                    Salvar Todas as Configurações & Integrações
-                  </button>
-                </form>
-              </div>
-            )}
+                  <div className="bg-slate-800/30 rounded-xl border border-slate-700/60 overflow-hidden">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-900/80 text-slate-400 border-b border-slate-700/60 uppercase text-[10px]">
+                        <tr>
+                          <th className="p-3">Cliente</th>
+                          <th className="p-3">Telefone</th>
+                          <th className="p-3">CPF</th>
+                          <th className="p-3">Endereço Completo</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {filteredCustomers.map(cust => (
+                          <tr key={cust.id} className="hover:bg-slate-800/40">
+                            <td className="p-3 font-semibold text-white flex items-center gap-2">
+                              <Users size={14} className="text-purple-400" /> {cust.name}
+                            </td>
+                            <td className="p-3 text-purple-300 font-medium">{cust.phone}</td>
+                            <td className="p-3 text-slate-400">{cust.cpf || 'Não informado'}</td>
+                            <td className="p-3 text-slate-300 flex items-center gap-1">
+                              <MapPin size={12} className="text-slate-500 shrink-0" />
+                              {cust.street ? `${cust.street}, ${cust.number} - ${cust.neighborhood}, ${cust.city}/${cust.state}` : 'Sem endereço registrado'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
+              {/* Aba 4: Modo 24h & Integrações (Somente Admin) */}
+              {activeTab === 'integrations' && userRole === 'admin' && (
+                <div className="space-y-6">
+                  {/* Seção Modo 24h */}
+                  <div className="bg-purple-950/40 border border-purple-500/40 p-5 rounded-xl flex items-center justify-between">
+                    <div>
+                      <h4 className="text-base font-bold text-white flex items-center gap-2">
+                        <Zap className="text-yellow-400 fill-yellow-400" size={18} /> Modo 24h (Entrega Expressa)
+                      </h4>
+                      <p className="text-xs text-purple-200 mt-1 max-w-xl">
+                        Quando ATIVO: Oculta a opção de personalizar bottons no e-commerce, vende apenas produtos prontos do catálogo e altera a frase do hero da loja.
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleToggleModo24h}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-all shadow-lg ${
+                        modo24h ? 'bg-yellow-500 text-black hover:bg-yellow-400 shadow-yellow-500/20' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      {modo24h ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
+                      {modo24h ? 'MODO 24h ATIVO' : 'MODO PADRÃO'}
+                    </button>
+                  </div>
+
+                  {/* Seção Mercado Pago Sandbox / Produção */}
+                  <div className="bg-slate-800/40 border border-slate-700/60 p-5 rounded-xl flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                        <CreditCard className="text-sky-400" size={18} /> Mercado Pago Environment
+                      </h4>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Ambiente atual: <strong className="text-sky-300">{mpEnvironment.toUpperCase()}</strong>. Troque entre Sandbox (Testes) e Produção.
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleToggleMpEnvironment}
+                      className={`px-4 py-2 rounded-xl font-bold text-xs border transition-all ${
+                        mpEnvironment === 'sandbox'
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
+                          : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                      }`}
+                    >
+                      {mpEnvironment === 'sandbox' ? '🧪 Ambiente: SANDBOX' : '🚀 Ambiente: PRODUÇÃO'}
+                    </button>
+                  </div>
+
+                  {/* Chaves de Integração */}
+                  <div className="bg-slate-800/30 p-5 rounded-xl border border-slate-700/60 space-y-4">
+                    <h4 className="text-xs font-bold text-slate-300 uppercase flex items-center gap-2">
+                      <Key size={14} className="text-purple-400" /> Evolution API & Chaves de Integração
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                      <div>
+                        <label className="block text-slate-400 mb-1">Evolution API Endpoint</label>
+                        <input type="text" value={evoUrl} readOnly className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-slate-300" />
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 mb-1">Mercado Pago Access Token</label>
+                        <input type="password" value={mpToken} readOnly className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-slate-300" />
+                      </div>
+                    </div>
+
+                    <div className="pt-2">
+                      <a href={`${evoUrl}/manager`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2 rounded-lg text-xs transition-colors">
+                        <ExternalLink size={14} /> Abrir Evolution Manager (WhatsApp QR Code)
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
-
       </div>
     </div>
   );

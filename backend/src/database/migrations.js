@@ -90,12 +90,36 @@ async function runMigrations() {
         name VARCHAR(100) NOT NULL,
         email VARCHAR(100) UNIQUE NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
+        role VARCHAR(20) DEFAULT 'funcionario',
         is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
-    // 7. Tabela de Configurações Globais da Loja (Modo Evento 24h vs 5 Dias)
+    // Adicionar coluna role se admin_users já existia sem ela
+    await db.query(`
+      ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'funcionario';
+    `);
+
+    // 7. Tabela de Clientes Compradores
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS customers (
+        id VARCHAR(36) PRIMARY KEY,
+        name VARCHAR(150) NOT NULL,
+        phone VARCHAR(50) UNIQUE NOT NULL,
+        cpf VARCHAR(20),
+        street VARCHAR(255),
+        number VARCHAR(50),
+        complement VARCHAR(100),
+        neighborhood VARCHAR(100),
+        city VARCHAR(100),
+        state VARCHAR(50),
+        zip_code VARCHAR(20),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 8. Tabela de Configurações Globais da Loja
     await db.query(`
       CREATE TABLE IF NOT EXISTS store_config (
         key VARCHAR(50) PRIMARY KEY,
@@ -103,13 +127,23 @@ async function runMigrations() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
       INSERT INTO store_config (key, value)
-      VALUES ('modo_evento_24h', 'false')
+      VALUES 
+        ('modo_evento_24h', 'false'),
+        ('modo_24h', 'false'),
+        ('mp_environment', 'sandbox')
       ON CONFLICT (key) DO NOTHING;
     `);
 
-    // Adicionar coluna delivery_deadline na tabela orders se não existir
+    // Adicionar colunas de estoque e personalização em products se não existirem
+    await db.query(`
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_quantity INT DEFAULT 10;
+    `);
+
+    // Adicionar colunas adicionais na tabela orders se não existirem
     await db.query(`
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_deadline VARCHAR(50) DEFAULT '5 dias úteis';
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id VARCHAR(36) REFERENCES customers(id) ON DELETE SET NULL;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS pdf_url TEXT;
     `);
 
     console.log('✅ Migrations executadas com sucesso no PostgreSQL!');

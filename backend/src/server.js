@@ -8,8 +8,10 @@ dotenv.config();
 const authController = require('./controllers/authController');
 const productController = require('./controllers/productController');
 const orderController = require('./controllers/orderController');
+const customerController = require('./controllers/customerController');
 const webhookController = require('./controllers/webhookController');
 const configController = require('./controllers/configController');
+const { verifyToken, requireRole } = require('./middlewares/authMiddleware');
 const { runMigrations } = require('./database/migrations');
 const { runSeed } = require('./database/seed');
 
@@ -41,12 +43,20 @@ app.post('/api/orders', orderController.createOrder);
 // Webhook Mercado Pago
 app.post('/api/webhooks/mercadopago', webhookController.handleMercadoPagoWebhook);
 
-// Rotas Protegidas de Administração
-app.post('/api/admin/config', authController.verifyTokenMiddleware, configController.updateConfig);
-app.post('/api/admin/categories', authController.verifyTokenMiddleware, productController.createCategory);
-app.post('/api/admin/products', authController.verifyTokenMiddleware, productController.createProduct);
-app.get('/api/admin/production-queue', authController.verifyTokenMiddleware, orderController.getProductionQueue);
-app.patch('/api/admin/orders/:id/production-status', authController.verifyTokenMiddleware, orderController.updateProductionStatus);
+// Rotas Protegidas de Administração (Admin e Funcionário)
+app.get('/api/admin/customers', verifyToken, requireRole(['admin', 'funcionario']), customerController.getCustomers);
+app.post('/api/admin/customers', verifyToken, requireRole(['admin', 'funcionario']), customerController.upsertCustomer);
+
+app.post('/api/admin/categories', verifyToken, requireRole(['admin', 'funcionario']), productController.createCategory);
+app.post('/api/admin/products', verifyToken, requireRole(['admin', 'funcionario']), productController.createProduct);
+app.put('/api/admin/products/:id', verifyToken, requireRole(['admin', 'funcionario']), productController.updateProduct);
+app.delete('/api/admin/products/:id', verifyToken, requireRole(['admin']), productController.deleteProduct);
+
+app.get('/api/admin/production-queue', verifyToken, requireRole(['admin', 'funcionario']), orderController.getProductionQueue);
+app.patch('/api/admin/orders/:id/production-status', verifyToken, requireRole(['admin', 'funcionario']), orderController.updateProductionStatus);
+
+// Rota de Configurações Sensíveis (Exclusiva de Admin)
+app.post('/api/admin/config', verifyToken, requireRole(['admin']), configController.updateConfig);
 
 async function startServer() {
   try {

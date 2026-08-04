@@ -1,20 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Catalog from './components/Catalog';
-import BottonPreviewCanvas from './components/BottonPreviewCanvas';
+import BottonPreviewModal from './components/BottonPreviewModal';
 import SizeGuideModal from './components/SizeGuideModal';
 import Checkout from './components/Checkout';
 import AdminDashboard from './components/AdminDashboard';
 import { Sparkles, ShieldCheck, Clock, Award, Zap } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('catalog'); // 'catalog' | 'fastfood'
+  const [activeTab, setActiveTab] = useState('catalog');
   const [cart, setCart] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [isCustomizerModalOpen, setIsCustomizerModalOpen] = useState(false);
   const [isEventoMode, setIsEventoMode] = useState(false);
-  const [guideProceedTarget, setGuideProceedTarget] = useState(null); // 'fastfood' | 'cart' | null
+  const [isModo24h, setIsModo24h] = useState(false);
+  const [heroPhrase, setHeroPhrase] = useState('Escolha seu botton no catálogo ou personalize um modelo exclusivo com a sua imagem.');
+  const [guideProceedTarget, setGuideProceedTarget] = useState(null);
 
   useEffect(() => {
     if (window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin')) {
@@ -24,11 +27,13 @@ export default function App() {
     fetch('/api/config')
       .then(res => res.json())
       .then(data => {
-        if (data && typeof data.modo_evento_24h === 'boolean') {
-          setIsEventoMode(data.modo_evento_24h);
+        if (data) {
+          if (typeof data.modo_evento_24h === 'boolean') setIsEventoMode(data.modo_evento_24h);
+          if (typeof data.modo_24h === 'boolean') setIsModo24h(data.modo_24h);
+          if (data.hero_phrase) setHeroPhrase(data.hero_phrase);
         }
       })
-      .catch(err => console.log('Usando modo padrão 5 dias (api/config indisponível no momento):', err.message));
+      .catch(err => console.log('Usando configurações padrão:', err.message));
   }, []);
 
   function handleAddToCart(item) {
@@ -38,21 +43,19 @@ export default function App() {
 
   function handleAddToCartFromCatalog(item) {
     setCart(prev => [...prev, item]);
-    // Abrir o guia de tamanhos como confirmação visual antes do carrinho
     setGuideProceedTarget('cart');
     setIsSizeGuideOpen(true);
   }
 
   function handleOpenCustomizerFlow() {
-    // Abrir o guia de tamanhos primeiro no fluxo de personalizador
-    setGuideProceedTarget('fastfood');
-    setIsSizeGuideOpen(true);
+    if (isModo24h) return; // Não abre no modo 24h
+    setIsCustomizerModalOpen(true);
   }
 
-   function handleConfirmSizeGuide() {
+  function handleConfirmSizeGuide() {
     setIsSizeGuideOpen(false);
     if (guideProceedTarget === 'fastfood') {
-      setActiveTab('fastfood');
+      setIsCustomizerModalOpen(true);
     } else if (guideProceedTarget === 'cart') {
       setIsCartOpen(true);
     }
@@ -63,11 +66,25 @@ export default function App() {
     setCart([]);
   }
 
+  if (isAdminOpen) {
+    return (
+      <AdminDashboard
+        isOpen={true}
+        isEventoMode={isEventoMode}
+        onToggleEventoMode={(newVal) => setIsEventoMode(newVal)}
+        onClose={() => {
+          setIsAdminOpen(false);
+          window.history.pushState({}, '', '/');
+        }}
+      />
+    );
+  }
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       
-      {/* Banner de Aviso Chamativo - Apenas quando a Flag Modo Evento estiver Ativa */}
-      {isEventoMode && (
+      {/* Banner de Aviso Modo 24h / Evento */}
+      {(isEventoMode || isModo24h) && (
         <div style={{
           background: 'linear-gradient(90deg, #173440, #3fb9c8)',
           color: '#ffffff',
@@ -82,11 +99,11 @@ export default function App() {
           boxShadow: '0 2px 8px rgba(23,52,64,0.2)'
         }}>
           <Zap size={18} color="#fff7eb" />
-          <span>⚡ MODO EVENTO ATIVO: Produção Noturna Expressa & Envio em 24h!</span>
+          <span>⚡ MODO ENTREGA RÁPIDA 24h ATIVO: Produção Noturna & Postagem em até 24 Horas!</span>
         </div>
       )}
 
-      {/* Header institucional */}
+      {/* Header Institucional */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -112,13 +129,9 @@ export default function App() {
               Papelaria • Religiosos • Bottons
             </span>
 
-            {/* Frase dinâmica do Hero baseada no Modo Evento (RN-05) */}
-            <h1 style={{ fontSize: '2.5rem', lineHeight: '1.25', color: '#ffffff', marginBottom: '16px' }}>
-              {isEventoMode ? (
-                <>Seu botton em <span style={{ color: 'var(--secondary)' }}>24 Horas</span> com opção de personalizar.</>
-              ) : (
-                <>Escolha seu botton, chaveiro ou ímã com as imagens abaixo ou personalize com uma imagem sua.</>
-              )}
+            {/* Frase dinâmica do Hero */}
+            <h1 style={{ fontSize: '2.4rem', lineHeight: '1.25', color: '#ffffff', marginBottom: '16px', fontWeight: '800' }}>
+              {heroPhrase}
             </h1>
 
             <p style={{ fontSize: '1.1rem', color: '#cbe4e8', marginBottom: '28px' }}>
@@ -126,9 +139,11 @@ export default function App() {
             </p>
 
             <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
-              <button className="btn btn-primary" onClick={handleOpenCustomizerFlow}>
-                <Sparkles size={18} /> Personalize com uma imagem
-              </button>
+              {!isModo24h && (
+                <button className="btn btn-primary" onClick={handleOpenCustomizerFlow}>
+                  <Sparkles size={18} /> Personalize com uma imagem
+                </button>
+              )}
               <button className="btn btn-outline" onClick={() => { setGuideProceedTarget(null); setIsSizeGuideOpen(true); }} style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)' }}>
                 Consultar Guia de Tamanhos
               </button>
@@ -154,7 +169,7 @@ export default function App() {
         <div className="container" style={{ display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: '16px', fontSize: '0.9rem', color: '#475569' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Clock size={18} color="var(--primary)" />
-            {isEventoMode ? 'Produção Noturna & Envio em 24h' : 'Produção Artesanal & Envio em até 5 Dias Úteis'}
+            {isModo24h || isEventoMode ? 'Produção Noturna & Envio em 24h' : 'Produção Artesanal & Envio em até 5 Dias Úteis'}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <ShieldCheck size={18} color="var(--primary)" /> Pagamento Seguro Mercado Pago
@@ -167,18 +182,6 @@ export default function App() {
 
       {/* Conteúdo Principal */}
       <main className="container" style={{ flex: 1, padding: '40px 20px' }}>
-        
-        {/* Seção Personalizador de Imagem */}
-        {activeTab === 'fastfood' && (
-          <div style={{ marginBottom: '50px' }}>
-            <BottonPreviewCanvas
-              onAddToCart={handleAddToCart}
-              onOpenSizeGuide={() => { setGuideProceedTarget(null); setIsSizeGuideOpen(true); }}
-            />
-          </div>
-        )}
-
-        {/* Seção Catálogo Geral por Categorias (Foco Principal da Loja) */}
         <div style={{ marginTop: '20px' }}>
           <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '12px' }}>
             <div>
@@ -190,18 +193,20 @@ export default function App() {
               </p>
             </div>
 
-            <button className="btn btn-outline" onClick={handleOpenCustomizerFlow} style={{ fontSize: '0.9rem' }}>
-              <Sparkles size={16} color="var(--primary)" /> Personalize com uma imagem
-            </button>
+            {!isModo24h && (
+              <button className="btn btn-outline" onClick={handleOpenCustomizerFlow} style={{ fontSize: '0.9rem' }}>
+                <Sparkles size={16} color="var(--primary)" /> Personalize com uma imagem
+              </button>
+            )}
           </div>
 
           <Catalog
             isEventoMode={isEventoMode}
+            isModo24h={isModo24h}
             onAddToCart={handleAddToCartFromCatalog}
             onCustomizeClick={handleOpenCustomizerFlow}
           />
         </div>
-
       </main>
 
       {/* Footer */}
@@ -232,6 +237,12 @@ export default function App() {
       </footer>
 
       {/* Modais da Aplicação */}
+      <BottonPreviewModal
+        isOpen={isCustomizerModalOpen}
+        onClose={() => setIsCustomizerModalOpen(false)}
+        onAddToCart={handleAddToCart}
+      />
+
       <SizeGuideModal
         isOpen={isSizeGuideOpen}
         onClose={() => { setIsSizeGuideOpen(false); setGuideProceedTarget(null); }}
@@ -241,7 +252,7 @@ export default function App() {
 
       <Checkout
         cart={cart}
-        isEventoMode={isEventoMode}
+        isEventoMode={isEventoMode || isModo24h}
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
         onClearCart={handleClearCart}
