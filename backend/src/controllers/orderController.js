@@ -134,8 +134,16 @@ async function createOrder(req, res) {
         customer_phone,
         pdfBuffer,
         `Pedido_TutasPaper_${orderId}.pdf`,
-        `Olá, ${customer_name}! Agradecemos a preferência. Segue em anexo o comprovante timbrado do seu pedido #${orderId.slice(-8)}.`
+        `Olá, ${customer_name}! Agradecemos a preferência na Tuta's Paper. Segue em anexo o comprovante timbrado do seu pedido #${orderId.slice(-8)} (Total: R$ ${totalAmount.toFixed(2)}).`
       );
+
+      // Notificar Admin / Equipe de Produção se houver WhatsApp configurado
+      const adminConfig = await db.query("SELECT value FROM store_config WHERE key = 'admin_phone'");
+      if (adminConfig.rows.length > 0 && adminConfig.rows[0].value) {
+        const adminPhone = adminConfig.rows[0].value;
+        const adminMsg = `🚨 NOVO PEDIDO RECEBIDO! #${orderId.slice(-8)}\nCliente: ${customer_name} (${customer_phone})\nValor Total: R$ ${totalAmount.toFixed(2)}\nItens: ${processedItems.length} item(ns) disponíveis na Fila Noturna de Impressão!`;
+        whatsappService.sendTextMessage(adminPhone, adminMsg);
+      }
     } catch (pdfErr) {
       console.error('Aviso ao gerar/enviar PDF timbrado:', pdfErr.message);
     }
@@ -191,7 +199,7 @@ async function getProductionQueue(req, res) {
   }
 }
 
-// Atualizar Status de Produção (Admin)
+// Atualizar Status de Produção (Admin/Funcionário) com Notificação WhatsApp de Conclusão
 async function updateProductionStatus(req, res) {
   try {
     const { id } = req.params;
@@ -211,15 +219,55 @@ async function updateProductionStatus(req, res) {
       return res.status(404).json({ error: 'Pedido não encontrado.' });
     }
 
-    return res.json(result.rows[0]);
+    const order = result.rows[0];
+
+    // Se o pedido for finalizado / pronto, enviar notificação por WhatsApp ao comprador
+    if (production_status === 'completed' || production_status === 'ready') {
+      try {
+        const msg = `🎉 Olá, ${order.customer_name}! Seu pedido #${order.id.slice(-8)} na Tuta's Paper foi CONCLUÍDO e está PRONTO para envio/entrega! Agradecemos a sua preferência!`;
+        whatsappService.sendTextMessage(order.customer_phone, msg);
+      } catch (waErr) {
+        console.error('Aviso ao notificar conclusão via WhatsApp:', waErr.message);
+      }
+    }
+
+    return res.json(order);
   } catch (error) {
     console.error('Erro ao atualizar status de produção:', error);
     return res.status(500).json({ error: 'Erro ao atualizar status.' });
   }
 }
 
+// Estatísticas Financeiras & Estoque para o Dashboard (Admin)
+async function getDashboardStats(req, res) {
+  try {
+    const salesRes = await db.query("SELECT COALESCE(SUM(total_amount), 0) as total_sales, COUNT(*) as total_orders FROM orders");
+    const monthlyRes = await db.query("SELECT COALESCE(SUM(total_amount), 0) as monthly_sales FROM orders WHERE date_trunc('month', created_at) = date_trunc('month', CURRENT_TIMESTAMP)");
+    const pendingRes = await db.query("SELECT COUNT(*) as pending_orders FROM orders WHERE production_status = 'pending'");
+    const prodRes = await db.query("SELECT COUNT(*) as total_products, COALESCE(SUM(base_price * stock_quantity), 0) as stock_monetary_value, COALESCE(SUM(stock_quantity), 0) as stock_total_items FROM products WHERE is_active = TRUE");
+    const stockRes = await db.query("SELECT COUNT(*) as low_stock FROM products WHERE stock_quantity <= 5 AND is_active = TRUE");
+    const custRes = await db.query("SELECT COUNT(*) as total_customers FROM customers");
+
+    return res.json({
+      total_sales: parseFloat(salesRes.rows[0].total_sales || 0),
+      monthly_sales: parseFloat(monthlyRes.rows[0].monthly_sales || 0),
+      total_orders: parseInt(salesRes.rows[0].total_orders || 0),
+      pending_orders: parseInt(pendingRes.rows[0].pending_orders || 0),
+      total_products: parseInt(prodRes.rows[0].total_products || 0),
+      stock_monetary_value: parseFloat(prodRes.rows[0].stock_monetary_value || 0),
+      stock_total_items: parseInt(prodRes.rows[0].stock_total_items || 0),
+      low_stock: parseInt(stockRes.rows[0].low_stock || 0),
+      total_customers: parseInt(custRes.rows[0].total_customers || 0)
+    });
+  } catch (error) {
+    console.error('Erro ao buscar métricas do dashboard:', error);
+    return res.status(500).json({ error: 'Erro ao buscar estatísticas do dashboard.' });
+  }
+}
+
 module.exports = {
   createOrder,
   getProductionQueue,
-  updateProductionStatus
+  updateProductionStatus,
+  getDashboardStats
 };

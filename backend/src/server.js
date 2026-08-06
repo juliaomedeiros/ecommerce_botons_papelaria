@@ -43,9 +43,36 @@ app.post('/api/orders', orderController.createOrder);
 // Webhook Mercado Pago
 app.post('/api/webhooks/mercadopago', webhookController.handleMercadoPagoWebhook);
 
+const multer = require('multer');
+const fs = require('fs');
+
+const productStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(UPLOADS_DIR, 'products');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.jpg';
+    cb(null, `prod-${Date.now()}${ext}`);
+  }
+});
+const uploadProduct = multer({ storage: productStorage });
+
+// Upload de Imagens de Produtos (Admin/Funcionário)
+app.post('/api/admin/upload-product-image', verifyToken, requireRole(['admin', 'funcionario']), uploadProduct.single('image'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+  const imageUrl = `/uploads/products/${req.file.filename}`;
+  return res.json({ imageUrl, message: 'Imagem do produto enviada com sucesso!' });
+});
+
+// Métricas do Dashboard (Admin/Funcionário)
+app.get('/api/admin/dashboard-stats', verifyToken, requireRole(['admin', 'funcionario']), orderController.getDashboardStats);
+
 // Rotas Protegidas de Administração (Admin e Funcionário)
 app.get('/api/admin/customers', verifyToken, requireRole(['admin', 'funcionario']), customerController.getCustomers);
 app.post('/api/admin/customers', verifyToken, requireRole(['admin', 'funcionario']), customerController.upsertCustomer);
+app.delete('/api/admin/customers/:id', verifyToken, requireRole(['admin', 'funcionario']), customerController.deleteCustomer);
 
 app.post('/api/admin/categories', verifyToken, requireRole(['admin', 'funcionario']), productController.createCategory);
 app.post('/api/admin/products', verifyToken, requireRole(['admin', 'funcionario']), productController.createProduct);
@@ -55,8 +82,31 @@ app.delete('/api/admin/products/:id', verifyToken, requireRole(['admin']), produ
 app.get('/api/admin/production-queue', verifyToken, requireRole(['admin', 'funcionario']), orderController.getProductionQueue);
 app.patch('/api/admin/orders/:id/production-status', verifyToken, requireRole(['admin', 'funcionario']), orderController.updateProductionStatus);
 
-// Rota de Configurações Sensíveis (Exclusiva de Admin)
+// Rotas de Gestão de Usuários Administrativos (Exclusivas Admin Master)
+app.get('/api/admin/users', verifyToken, requireRole(['admin']), authController.getAdminUsers);
+app.post('/api/admin/users', verifyToken, requireRole(['admin']), authController.createAdminUser);
+app.delete('/api/admin/users/:id', verifyToken, requireRole(['admin']), authController.deleteAdminUser);
+
+// Rota de Configurações Sensíveis & Reset de Dados de Teste (Exclusivas de Admin)
 app.post('/api/admin/config', verifyToken, requireRole(['admin']), configController.updateConfig);
+app.post('/api/admin/reset-demo-data', verifyToken, requireRole(['admin']), configController.resetDemoData);
+
+// Servir Frontend em Produção (Build estático se disponível)
+const FRONTEND_DIST = path.join(__dirname, '../../frontend/dist');
+app.use(express.static(FRONTEND_DIST));
+
+// SPA Fallback para rotas do React (/home, /admin, /carrinho, etc.)
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
+    return next();
+  }
+  const indexPath = path.join(FRONTEND_DIST, 'index.html');
+  res.sendFile(indexPath, (err) => {
+    if (err) {
+      res.status(200).send('API Tuta\'s Paper operacional. Para o frontend, acesse a porta do Vite (3000) ou o Nginx (80).');
+    }
+  });
+});
 
 async function startServer() {
   try {

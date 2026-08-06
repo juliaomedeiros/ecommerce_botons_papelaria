@@ -47,7 +47,20 @@ async function upsertCustomer(req, res) {
   }
 }
 
+// Excluir cliente comprador por ID (Admin/Funcionário)
+async function deleteCustomer(req, res) {
+  try {
+    const { id } = req.params;
+    await db.query('DELETE FROM customers WHERE id = $1', [id]);
+    return res.json({ message: 'Cliente removido com sucesso!' });
+  } catch (error) {
+    console.error('Erro ao excluir cliente:', error);
+    return res.status(500).json({ error: 'Erro interno ao excluir cliente.' });
+  }
+}
+
 module.exports = {
   getCustomers,
-  upsertCustomer
+  upsertCustomer,
+  deleteCustomer
 };

@@ -1,27 +1,35 @@
 import React, { useState, useEffect } from 'react';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Catalog from './components/Catalog';
 import BottonPreviewModal from './components/BottonPreviewModal';
 import SizeGuideModal from './components/SizeGuideModal';
 import Checkout from './components/Checkout';
 import AdminDashboard from './components/AdminDashboard';
+import ProductDetailModal from './components/ProductDetailModal';
 import { Sparkles, ShieldCheck, Clock, Award, Zap } from 'lucide-react';
 
 export default function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [activeTab, setActiveTab] = useState('catalog');
   const [cart, setCart] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
-  const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isCustomizerModalOpen, setIsCustomizerModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
   const [isEventoMode, setIsEventoMode] = useState(false);
   const [isModo24h, setIsModo24h] = useState(false);
   const [heroPhrase, setHeroPhrase] = useState('Escolha seu botton no catálogo ou personalize um modelo exclusivo com a sua imagem.');
   const [guideProceedTarget, setGuideProceedTarget] = useState(null);
 
+  // Sincronizar estado de rotas (/admin, /carrinho, /home, /)
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  
   useEffect(() => {
-    if (window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin')) {
-      setIsAdminOpen(true);
+    if (location.pathname === '/carrinho') {
+      setIsCartOpen(true);
     }
 
     fetch('/api/config')
@@ -34,7 +42,7 @@ export default function App() {
         }
       })
       .catch(err => console.log('Usando configurações padrão:', err.message));
-  }, []);
+  }, [location.pathname]);
 
   function handleAddToCart(item) {
     setCart(prev => [...prev, item]);
@@ -48,7 +56,7 @@ export default function App() {
   }
 
   function handleOpenCustomizerFlow() {
-    if (isModo24h) return; // Não abre no modo 24h
+    if (isModo24h) return;
     setIsCustomizerModalOpen(true);
   }
 
@@ -66,16 +74,34 @@ export default function App() {
     setCart([]);
   }
 
-  if (isAdminOpen) {
+  function handleOpenCart() {
+    setIsCartOpen(true);
+    navigate('/carrinho');
+  }
+
+  function handleCloseCart() {
+    setIsCartOpen(false);
+    if (location.pathname === '/carrinho') {
+      navigate('/home');
+    }
+  }
+
+  function handleOpenAdmin() {
+    navigate('/admin');
+  }
+
+  function handleCloseAdmin() {
+    navigate('/home');
+  }
+
+  // Se estiver na rota /admin, renderiza o AdminDashboard com suporte total a Tailwind
+  if (isAdminRoute) {
     return (
       <AdminDashboard
         isOpen={true}
         isEventoMode={isEventoMode}
         onToggleEventoMode={(newVal) => setIsEventoMode(newVal)}
-        onClose={() => {
-          setIsAdminOpen(false);
-          window.history.pushState({}, '', '/');
-        }}
+        onClose={handleCloseAdmin}
       />
     );
   }
@@ -103,111 +129,113 @@ export default function App() {
         </div>
       )}
 
-      {/* Header Institucional */}
+      {/* Header Institucional com navegação por rotas */}
       <Navbar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={(tab) => {
+          setActiveTab(tab);
+          navigate('/home');
+        }}
         cartCount={cart.length}
-        openCart={() => setIsCartOpen(true)}
-        onAdminClick={() => setIsAdminOpen(true)}
+        openCart={handleOpenCart}
+        onAdminClick={handleOpenAdmin}
         onCustomizeClick={handleOpenCustomizerFlow}
         onOpenSizeGuide={() => { setGuideProceedTarget(null); setIsSizeGuideOpen(true); }}
       />
 
-      {/* Hero Section */}
-      <section style={{
-        background: 'linear-gradient(135deg, #0c1a20 0%, #173440 100%)',
-        color: '#ffffff',
-        padding: '50px 0 60px',
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
-        <div className="container" style={{ position: 'relative', zIndex: 2 }}>
-          <div style={{ maxWidth: '780px' }}>
-            <span className="badge badge-gold" style={{ marginBottom: '14px', letterSpacing: '0.5px' }}>
-              <Sparkles size={14} style={{ display: 'inline', marginRight: '4px' }} />
-              Papelaria • Religiosos • Bottons
-            </span>
+      <Routes>
+        <Route path="*" element={
+          <>
+            {/* Hero Section */}
+            <section style={{
+              background: 'linear-gradient(135deg, #0c1a20 0%, #173440 100%)',
+              color: '#ffffff',
+              padding: '50px 0 60px',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              <div className="container" style={{ position: 'relative', zIndex: 2 }}>
+                <div style={{ maxWidth: '780px' }}>
+                  <span className="badge badge-gold" style={{ marginBottom: '14px', letterSpacing: '0.5px' }}>
+                    <Sparkles size={14} style={{ display: 'inline', marginRight: '4px' }} />
+                    Papelaria • Religiosos • Bottons
+                  </span>
 
-            {/* Frase dinâmica do Hero */}
-            <h1 style={{ fontSize: '2.4rem', lineHeight: '1.25', color: '#ffffff', marginBottom: '16px', fontWeight: '800' }}>
-              {heroPhrase}
-            </h1>
+                  {/* Frase dinâmica do Hero */}
+                  <h1 style={{ fontSize: '2.4rem', lineHeight: '1.25', color: '#ffffff', marginBottom: '16px', fontWeight: '800' }}>
+                    {heroPhrase}
+                  </h1>
 
-            <p style={{ fontSize: '1.1rem', color: '#cbe4e8', marginBottom: '28px' }}>
-              Disponível nos diâmetros de <strong>25mm</strong> (discreto) e <strong>38mm</strong> (padrão). Escolha o acabamento ideal de <strong>Alfinete</strong>, <strong>Chaveiro</strong> ou <strong>Ímã de Geladeira</strong>.
-            </p>
+                  <p style={{ fontSize: '1.1rem', color: '#cbe4e8', marginBottom: '28px' }}>
+                    Disponível nos diâmetros de <strong>25mm</strong> (discreto) e <strong>38mm</strong> (padrão). Escolha o acabamento ideal de <strong>Alfinete</strong>, <strong>Chaveiro</strong> ou <strong>Ímã de Geladeira</strong>.
+                  </p>
 
-            <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
-              {!isModo24h && (
-                <button className="btn btn-primary" onClick={handleOpenCustomizerFlow}>
-                  <Sparkles size={18} /> Personalize com uma imagem
-                </button>
-              )}
-              <button className="btn btn-outline" onClick={() => { setGuideProceedTarget(null); setIsSizeGuideOpen(true); }} style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)' }}>
-                Consultar Guia de Tamanhos
-              </button>
-            </div>
-          </div>
-        </div>
+                  <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+                    {!isModo24h && (
+                      <button className="btn btn-primary" onClick={handleOpenCustomizerFlow}>
+                        <Sparkles size={18} /> Personalize com uma imagem
+                      </button>
+                    )}
+                    <button className="btn btn-outline" onClick={() => { setGuideProceedTarget(null); setIsSizeGuideOpen(true); }} style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)' }}>
+                      Consultar Guia de Tamanhos
+                    </button>
+                  </div>
+                </div>
+              </div>
 
-        {/* Círculos decorativos no Hero */}
-        <div style={{
-          position: 'absolute',
-          right: '-50px',
-          bottom: '-50px',
-          width: '350px',
-          height: '350px',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(63,185,200,0.2) 0%, rgba(0,0,0,0) 70%)',
-          pointerEvents: 'none'
-        }} />
-      </section>
+              {/* Círculos decorativos no Hero */}
+              <div style={{
+                position: 'absolute',
+                right: '-50px',
+                bottom: '-50px',
+                width: '350px',
+                height: '350px',
+                borderRadius: '50%',
+                background: 'radial-gradient(circle, rgba(63,185,200,0.2) 0%, rgba(0,0,0,0) 70%)',
+                pointerEvents: 'none'
+              }} />
+            </section>
 
-      {/* Destaques de Confiança */}
-      <div style={{ background: '#ffffff', borderBottom: '1px solid #cee4e8', padding: '16px 0' }}>
-        <div className="container" style={{ display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: '16px', fontSize: '0.9rem', color: '#475569' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Clock size={18} color="var(--primary)" />
-            {isModo24h || isEventoMode ? 'Produção Noturna & Envio em 24h' : 'Produção Artesanal & Envio em até 5 Dias Úteis'}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <ShieldCheck size={18} color="var(--primary)" /> Pagamento Seguro Mercado Pago
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Award size={18} color="var(--primary)" /> Tamanhos 25mm e 38mm com Prensa HD
-          </div>
-        </div>
-      </div>
-
-      {/* Conteúdo Principal */}
-      <main className="container" style={{ flex: 1, padding: '40px 20px' }}>
-        <div style={{ marginTop: '20px' }}>
-          <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '12px' }}>
-            <div>
-              <h2 style={{ fontSize: '1.8rem', color: 'var(--primary)', marginBottom: '4px' }}>
-                Catálogo de Modelos Prontos
-              </h2>
-              <p style={{ color: 'var(--text-muted)' }}>
-                Escolha a imagem desejada e selecione o diâmetro (25mm/38mm) e o acabamento.
-              </p>
+            {/* Destaques de Confiança */}
+            <div style={{ background: '#ffffff', borderBottom: '1px solid #cee4e8', padding: '16px 0' }}>
+              <div className="container" style={{ display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: '16px', fontSize: '0.9rem', color: '#475569' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Clock size={18} color="var(--primary)" />
+                  {isModo24h || isEventoMode ? 'Produção Noturna & Envio em 24h' : 'Produção Artesanal & Envio em até 5 Dias Úteis'}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ShieldCheck size={18} color="var(--primary)" /> Pagamento Seguro Mercado Pago
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Award size={18} color="var(--primary)" /> Tamanhos 25mm e 38mm com Prensa HD
+                </div>
+              </div>
             </div>
 
-            {!isModo24h && (
-              <button className="btn btn-outline" onClick={handleOpenCustomizerFlow} style={{ fontSize: '0.9rem' }}>
-                <Sparkles size={16} color="var(--primary)" /> Personalize com uma imagem
-              </button>
-            )}
-          </div>
+            {/* Conteúdo Principal */}
+            <main className="container" style={{ flex: 1, padding: '40px 20px' }}>
+              <div style={{ marginTop: '20px' }}>
+                <div style={{ marginBottom: '20px' }}>
+                  <h2 style={{ fontSize: '1.8rem', color: 'var(--primary)', marginBottom: '4px' }}>
+                    Catálogo de Modelos Prontos
+                  </h2>
+                  <p style={{ color: 'var(--text-muted)' }}>
+                    Escolha a imagem desejada e selecione o diâmetro (25mm/38mm) e o acabamento.
+                  </p>
+                </div>
 
-          <Catalog
-            isEventoMode={isEventoMode}
-            isModo24h={isModo24h}
-            onAddToCart={handleAddToCartFromCatalog}
-            onCustomizeClick={handleOpenCustomizerFlow}
-          />
-        </div>
-      </main>
+                <Catalog
+                  isEventoMode={isEventoMode}
+                  isModo24h={isModo24h}
+                  onAddToCart={handleAddToCartFromCatalog}
+                  onCustomizeClick={handleOpenCustomizerFlow}
+                  onSelectProduct={(prod) => setSelectedProduct(prod)}
+                />
+              </div>
+            </main>
+          </>
+        } />
+      </Routes>
 
       {/* Footer */}
       <footer style={{ background: 'var(--dark)', color: '#94a3b8', padding: '40px 0 20px', borderTop: '1px solid #142832' }}>
@@ -237,6 +265,15 @@ export default function App() {
       </footer>
 
       {/* Modais da Aplicação */}
+      <ProductDetailModal
+        product={selectedProduct}
+        isOpen={!!selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+        onAddToCart={handleAddToCart}
+        onCustomizeClick={handleOpenCustomizerFlow}
+        isModo24h={isModo24h}
+      />
+
       <BottonPreviewModal
         isOpen={isCustomizerModalOpen}
         onClose={() => setIsCustomizerModalOpen(false)}
@@ -254,15 +291,8 @@ export default function App() {
         cart={cart}
         isEventoMode={isEventoMode || isModo24h}
         isOpen={isCartOpen}
-        onClose={() => setIsCartOpen(false)}
+        onClose={handleCloseCart}
         onClearCart={handleClearCart}
-      />
-
-      <AdminDashboard
-        isOpen={isAdminOpen}
-        isEventoMode={isEventoMode}
-        onToggleEventoMode={(newVal) => setIsEventoMode(newVal)}
-        onClose={() => setIsAdminOpen(false)}
       />
 
     </div>

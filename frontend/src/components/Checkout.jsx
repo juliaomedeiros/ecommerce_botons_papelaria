@@ -102,8 +102,11 @@ export default function Checkout({ cart, isEventoMode, isOpen, onClose, onClearC
         {step === 'cart' && (
           <div>
             {cart.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b' }}>
-                <p>Seu carrinho está vazio.</p>
+              <div style={{ textAlign: 'center', padding: '30px 0', color: '#64748b' }}>
+                <p style={{ marginBottom: '16px', fontSize: '1rem' }}>Seu carrinho está vazio.</p>
+                <button className="btn btn-primary" onClick={onClose} style={{ width: '100%' }}>
+                  Continuar Comprando
+                </button>
               </div>
             ) : (
               <div>
@@ -133,9 +136,14 @@ export default function Checkout({ cart, isEventoMode, isOpen, onClose, onClearC
                   </div>
                 </div>
 
-                <button className="btn btn-primary" onClick={() => setStep('customer')} style={{ width: '100%', padding: '14px' }}>
-                  Avançar para Identificação <ArrowRight size={18} />
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <button className="btn btn-primary" onClick={() => setStep('customer')} style={{ width: '100%', padding: '14px' }}>
+                    Avançar para Identificação <ArrowRight size={18} />
+                  </button>
+                  <button className="btn btn-outline" onClick={onClose} style={{ width: '100%', padding: '10px' }}>
+                    Continuar Comprando
+                  </button>
+                </div>
               </div>
             )}
           </div>

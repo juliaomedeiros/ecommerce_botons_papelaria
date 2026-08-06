@@ -96,9 +96,10 @@ async function runMigrations() {
       );
     `);
 
-    // Adicionar coluna role se admin_users já existia sem ela
+    // Adicionar coluna role se admin_users já existia sem ela e garantir admin Master
     await db.query(`
       ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'funcionario';
+      UPDATE admin_users SET role = 'admin' WHERE email = 'admin@tutaspapeis.com.br';
     `);
 
     // 7. Tabela de Clientes Compradores
@@ -134,9 +135,10 @@ async function runMigrations() {
       ON CONFLICT (key) DO NOTHING;
     `);
 
-    // Adicionar colunas de estoque e personalização em products se não existirem
+    // Adicionar colunas de estoque, limite por compra e personalização em products se não existirem
     await db.query(`
       ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_quantity INT DEFAULT 10;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS max_limit_per_order INT DEFAULT 100;
     `);
 
     // Adicionar colunas adicionais na tabela orders se não existirem

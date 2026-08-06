@@ -1,33 +1,50 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, Layers, Calendar, Download, CheckCircle, RefreshCw, LogOut, Plus, Zap, Settings, ExternalLink, MessageSquare, CreditCard, Key, Globe, Shield, ArrowLeft, Users, Package, ShoppingBag, ToggleLeft, ToggleRight, Search, MapPin } from 'lucide-react';
+import { Lock, Layers, Calendar, Download, CheckCircle, RefreshCw, LogOut, Plus, Zap, Settings, ExternalLink, MessageSquare, CreditCard, Key, Globe, Shield, ArrowLeft, Users, Package, ShoppingBag, ToggleLeft, ToggleRight, Search, MapPin, Trash2, UserPlus, ShieldAlert, Check, AlertTriangle, Eye, EyeOff, LayoutDashboard, DollarSign, TrendingUp, Upload, Image as ImageIcon, Send, PhoneCall } from 'lucide-react';
 
 export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMode, onClose }) {
-  const [token, setToken] = useState(localStorage.getItem('tutas_token') || 'mock-jwt-token-tutas');
+  const [token, setToken] = useState(localStorage.getItem('tutas_token') || '');
   const [userRole, setUserRole] = useState(localStorage.getItem('tutas_role') || 'admin');
-  const [email, setEmail] = useState('admin@tutaspapeis.com.br');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
   
-  // Abas: 'production' | 'products' | 'customers' | 'integrations'
-  const [activeTab, setActiveTab] = useState('production');
+  // Abas: 'dashboard' | 'production' | 'products' | 'customers' | 'users' | 'integrations'
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [dashboardStats, setDashboardStats] = useState({
+    total_sales: 0,
+    monthly_sales: 0,
+    total_orders: 0,
+    pending_orders: 0,
+    total_products: 0,
+    stock_monetary_value: 0,
+    stock_total_items: 0,
+    low_stock: 0,
+    total_customers: 0
+  });
   const [productionQueue, setProductionQueue] = useState([]);
   const [productsList, setProductsList] = useState([]);
   const [customersList, setCustomersList] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [adminUsersList, setAdminUsersList] = useState([]);
 
-  // Configurações Globais
+  // Configurações Globais Mercado Pago & Evolution API
   const [modo24h, setModo24h] = useState(false);
   const [mpEnvironment, setMpEnvironment] = useState('sandbox');
-  const [mpToken, setMpToken] = useState('APP_USR-mock-token-mercadopago');
+  const [mpPublicKey, setMpPublicKey] = useState('');
+  const [mpAccessToken, setMpAccessToken] = useState('');
+  const [mpWebhookSecret, setMpWebhookSecret] = useState('');
   const [evoUrl, setEvoUrl] = useState('http://localhost:8080');
   const [evoKey, setEvoKey] = useState('tutas_evolution_key');
   const [evoInstance, setEvoInstance] = useState('tutaspaper');
+  const [adminPhone, setAdminPhone] = useState('');
 
   // Form de Produto
   const [prodName, setProdName] = useState('');
   const [prodCategory, setProdCategory] = useState('Geral');
   const [prodPrice, setProdPrice] = useState('15.00');
   const [prodStock, setProdStock] = useState('20');
+  const [prodMaxLimit, setProdMaxLimit] = useState('100');
   const [prodImg, setProdImg] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // Form de Cliente
   const [custName, setCustName] = useState('');
@@ -35,11 +52,14 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
   const [custCpf, setCustCpf] = useState('');
   const [custStreet, setCustStreet] = useState('');
   const [custNumber, setCustNumber] = useState('');
-  const [custNeighborhood, setCustNeighborhood] = useState('');
   const [custCity, setCustCity] = useState('João Pessoa');
-  const [custState, setCustState] = useState('PB');
-  const [custZip, setCustZip] = useState('58000-000');
   const [customerSearch, setCustomerSearch] = useState('');
+
+  // Form de Novo Usuário do Admin
+  const [newAdminName, setNewAdminName] = useState('');
+  const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [newAdminRole, setNewAdminRole] = useState('funcionario');
 
   if (!isOpen) return null;
 
@@ -49,16 +69,21 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
       .then(data => {
         if (data.modo_24h !== undefined) setModo24h(data.modo_24h);
         if (data.mp_environment) setMpEnvironment(data.mp_environment);
-        if (data.mercadopago_token) setMpToken(data.mercadopago_token);
+        if (data.mp_public_key) setMpPublicKey(data.mp_public_key);
+        if (data.mercadopago_token) setMpAccessToken(data.mercadopago_token);
+        if (data.mp_webhook_secret) setMpWebhookSecret(data.mp_webhook_secret);
         if (data.evolution_api_url) setEvoUrl(data.evolution_api_url);
         if (data.evolution_api_key) setEvoKey(data.evolution_api_key);
         if (data.evolution_instance_name) setEvoInstance(data.evolution_instance_name);
+        if (data.admin_phone) setAdminPhone(data.admin_phone);
       })
       .catch(err => console.log('Carregando config padrão:', err.message));
   }, []);
 
+  // Autenticação Rígida
   async function handleLogin(e) {
     if (e) e.preventDefault();
+    setLoginError('');
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -73,12 +98,10 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
         localStorage.setItem('tutas_token', data.token);
         localStorage.setItem('tutas_role', role);
       } else {
-        setToken('mock-jwt-token-tutas');
-        setUserRole('admin');
+        setLoginError(data.error || 'Credenciais inválidas. Verifique seu e-mail e senha.');
       }
     } catch (err) {
-      setToken('mock-jwt-token-tutas');
-      setUserRole('admin');
+      setLoginError('Erro de conexão ao autenticar. Tente novamente.');
     }
   }
 
@@ -91,14 +114,29 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
   // Carregar Dados Conforme Aba Ativa
   useEffect(() => {
     if (token) {
+      if (activeTab === 'dashboard') fetchDashboardStats();
       if (activeTab === 'production') fetchProductionQueue();
       if (activeTab === 'products') fetchProducts();
       if (activeTab === 'customers') fetchCustomers();
+      if (activeTab === 'users' && userRole === 'admin') fetchAdminUsers();
     }
   }, [token, activeTab]);
 
+  async function fetchDashboardStats() {
+    try {
+      const res = await fetch('/api/admin/dashboard-stats', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDashboardStats(data);
+      }
+    } catch (err) {
+      console.log('Erro ao carregar estatísticas:', err.message);
+    }
+  }
+
   async function fetchProductionQueue() {
-    setLoading(true);
     try {
       const res = await fetch('/api/admin/production-queue', {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -107,58 +145,26 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
         const data = await res.json();
         setProductionQueue(data);
       } else {
-        setMockQueue();
+        setProductionQueue([]);
       }
     } catch (err) {
-      setMockQueue();
-    } finally {
-      setLoading(false);
+      setProductionQueue([]);
     }
-  }
-
-  function setMockQueue() {
-    setProductionQueue([
-      {
-        order_id: 'ORD-1722300001',
-        customer_name: 'Julião Medeiros',
-        customer_phone: '(83) 99999-8888',
-        diameter: '38mm',
-        finish_type: 'chaveiro',
-        quantity: 10,
-        delivery_deadline: modo24h ? '24 horas' : '5 dias úteis',
-        production_status: 'pending',
-        cropped_image_url: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=500&auto=format&fit=crop&q=60'
-      }
-    ]);
   }
 
   async function fetchProducts() {
-    setLoading(true);
     try {
-      const res = await fetch('/api/products?include_inactive=true');
+      const res = await fetch('/api/products');
       if (res.ok) {
         const data = await res.json();
         setProductsList(data);
-      } else {
-        setMockProducts();
       }
     } catch (err) {
-      setMockProducts();
-    } finally {
-      setLoading(false);
+      console.log('Erro ao carregar produtos:', err.message);
     }
   }
 
-  function setMockProducts() {
-    setProductsList([
-      { id: 'p1', name: 'Botton Nossa Senhora Aparecida 38mm', category: 'Religiosos', base_price: 12.50, stock_quantity: 45, is_active: true },
-      { id: 'p2', name: 'Botton Sagrado Coração de Jesus', category: 'Religiosos', base_price: 15.00, stock_quantity: 12, is_active: true },
-      { id: 'p3', name: 'Botton Chaveiro EJC 2026', category: 'Eventos', base_price: 10.00, stock_quantity: 0, is_active: true }
-    ]);
-  }
-
   async function fetchCustomers() {
-    setLoading(true);
     try {
       const res = await fetch('/api/admin/customers', {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -166,79 +172,187 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
       if (res.ok) {
         const data = await res.json();
         setCustomersList(data);
-      } else {
-        setMockCustomers();
       }
     } catch (err) {
-      setMockCustomers();
-    } finally {
-      setLoading(false);
+      console.log('Erro ao carregar clientes:', err.message);
     }
   }
 
-  function setMockCustomers() {
-    setCustomersList([
-      {
-        id: 'c1',
-        name: 'Julião Medeiros',
-        phone: '83999998888',
-        cpf: '123.456.789-00',
-        street: 'Rua das Flores',
-        number: '123',
-        neighborhood: 'Centro',
-        city: 'João Pessoa',
-        state: 'PB',
-        zip_code: '58000-000'
-      },
-      {
-        id: 'c2',
-        name: 'Tati Papelaria',
-        phone: '83999853299',
-        cpf: '',
-        street: 'Av. Epitácio Pessoa',
-        number: '450',
-        neighborhood: 'Tambauzinho',
-        city: 'João Pessoa',
-        state: 'PB',
-        zip_code: '58040-000'
+  async function fetchAdminUsers() {
+    try {
+      const res = await fetch('/api/admin/users', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAdminUsersList(data);
       }
-    ]);
+    } catch (err) {
+      console.log('Erro ao carregar usuários admin:', err.message);
+    }
   }
 
-  // Ações de Atualização
+  // Upload de Imagem de Produto (Arquivo Físico)
+  async function handleProductFileUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('image', file);
+
+    setUploadingImage(true);
+    try {
+      const res = await fetch('/api/admin/upload-product-image', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+      const data = await res.json();
+      if (res.ok && data.imageUrl) {
+        setProdImg(data.imageUrl);
+      } else {
+        alert(data.error || 'Erro ao enviar imagem.');
+      }
+    } catch (err) {
+      alert('Erro ao realizar upload da imagem.');
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
+  // Finalizar Pedido & Notificar WhatsApp do Comprador
+  async function handleCompleteOrder(orderId, customerName) {
+    if (!window.confirm(`Deseja marcar o Pedido #${orderId} como CONCLUÍDO e notificar ${customerName} no WhatsApp?`)) return;
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}/production-status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ production_status: 'completed' })
+      });
+
+      if (res.ok) {
+        alert(`Pedido #${orderId} finalizado com sucesso! Mensagem de notificação enviada ao comprador no WhatsApp.`);
+        fetchProductionQueue();
+      } else {
+        alert('Erro ao finalizar pedido.');
+      }
+    } catch (err) {
+      alert('Erro de conexão ao atualizar status do pedido.');
+    }
+  }
+
+  // Cadastrar Usuário do Admin
+  async function handleAddAdminUser(e) {
+    e.preventDefault();
+    try {
+      const payload = {
+        name: newAdminName,
+        email: newAdminEmail,
+        password: newAdminPassword,
+        role: newAdminRole
+      };
+
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        alert('Usuário administrativo cadastrado com sucesso!');
+        setNewAdminName('');
+        setNewAdminEmail('');
+        setNewAdminPassword('');
+        fetchAdminUsers();
+      } else {
+        alert(data.error || 'Erro ao cadastrar usuário administrativo.');
+      }
+    } catch (err) {
+      alert('Erro de conexão ao cadastrar usuário.');
+    }
+  }
+
+  async function handleDeleteAdminUser(id, name) {
+    if (!window.confirm(`Tem certeza que deseja excluir o acesso administrativo de ${name}?`)) return;
+    try {
+      const res = await fetch(`/api/admin/users/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message || 'Usuário removido!');
+        fetchAdminUsers();
+      } else {
+        alert(data.error || 'Erro ao excluir usuário.');
+      }
+    } catch (err) {
+      alert('Erro de conexão ao excluir usuário.');
+    }
+  }
+
+  // Excluir Cliente Comprador
+  async function handleDeleteCustomer(id, name) {
+    if (!window.confirm(`Tem certeza que deseja excluir o cadastro do cliente ${name}?`)) return;
+    try {
+      const res = await fetch(`/api/admin/customers/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        alert('Cliente removido com sucesso!');
+        fetchCustomers();
+      } else {
+        alert('Erro ao excluir cliente.');
+      }
+    } catch (err) {
+      alert('Erro de conexão ao excluir cliente.');
+    }
+  }
+
+  // Cadastrar Produto com Imagem e Limite Máximo por Compra
   async function handleAddProduct(e) {
     e.preventDefault();
     try {
+      const payload = {
+        name: prodName,
+        category_id: null,
+        base_price: parseFloat(prodPrice),
+        stock_quantity: parseInt(prodStock),
+        max_limit_per_order: parseInt(prodMaxLimit),
+        image_url: prodImg || 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=500&auto=format&fit=crop&q=60'
+      };
+
       const res = await fetch('/api/admin/products', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          name: prodName,
-          category: prodCategory,
-          base_price: parseFloat(prodPrice),
-          stock_quantity: parseInt(prodStock),
-          image_url: prodImg || null
-        })
+        body: JSON.stringify(payload)
       });
+
       if (res.ok) {
         alert('Produto cadastrado com sucesso!');
         setProdName('');
+        setProdImg('');
         fetchProducts();
       } else {
-        alert('Produto salvo na lista local!');
-        setProductsList(prev => [{ id: `prod-${Date.now()}`, name: prodName, category: prodCategory, base_price: parseFloat(prodPrice), stock_quantity: parseInt(prodStock), is_active: true }, ...prev]);
-        setProdName('');
+        alert('Erro ao cadastrar produto.');
       }
     } catch (err) {
-      setProductsList(prev => [{ id: `prod-${Date.now()}`, name: prodName, category: prodCategory, base_price: parseFloat(prodPrice), stock_quantity: parseInt(prodStock), is_active: true }, ...prev]);
-      setProdName('');
+      alert('Erro na requisição de cadastro.');
     }
   }
 
-  async function handleUpdateProductPriceStock(id, newPrice, newStock) {
+  async function handleUpdateProductPriceStock(id, newPrice, newStock, newMaxLimit) {
     try {
       await fetch(`/api/admin/products/${id}`, {
         method: 'PUT',
@@ -246,79 +360,124 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ base_price: parseFloat(newPrice), stock_quantity: parseInt(newStock) })
+        body: JSON.stringify({
+          base_price: parseFloat(newPrice),
+          stock_quantity: parseInt(newStock),
+          max_limit_per_order: parseInt(newMaxLimit)
+        })
       });
-      setProductsList(prev => prev.map(p => p.id === id ? { ...p, base_price: parseFloat(newPrice), stock_quantity: parseInt(newStock) } : p));
+      fetchProducts();
     } catch (err) {
-      setProductsList(prev => prev.map(p => p.id === id ? { ...p, base_price: parseFloat(newPrice), stock_quantity: parseInt(newStock) } : p));
+      console.log('Erro ao atualizar produto:', err.message);
     }
   }
 
+  // Cadastrar Cliente Comprador
   async function handleAddCustomer(e) {
     e.preventDefault();
     try {
+      const payload = {
+        name: custName,
+        phone: custPhone,
+        cpf: custCpf,
+        street: custStreet,
+        number: custNumber,
+        city: custCity
+      };
+
       const res = await fetch('/api/admin/customers', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          name: custName,
-          phone: custPhone,
-          cpf: custCpf,
-          street: custStreet,
-          number: custNumber,
-          neighborhood: custNeighborhood,
-          city: custCity,
-          state: custState,
-          zip_code: custZip
-        })
+        body: JSON.stringify(payload)
       });
+
       if (res.ok) {
         alert('Cliente cadastrado com sucesso!');
         setCustName('');
         setCustPhone('');
         fetchCustomers();
       } else {
-        alert('Cliente adicionado!');
-        setCustomersList(prev => [{ id: `cust-${Date.now()}`, name: custName, phone: custPhone, cpf: custCpf, street: custStreet, number: custNumber, neighborhood: custNeighborhood, city: custCity, state: custState, zip_code: custZip }, ...prev]);
-        setCustName('');
-        setCustPhone('');
+        alert('Erro ao cadastrar cliente.');
       }
     } catch (err) {
-      setCustomersList(prev => [{ id: `cust-${Date.now()}`, name: custName, phone: custPhone, cpf: custCpf, street: custStreet, number: custNumber, neighborhood: custNeighborhood, city: custCity, state: custState, zip_code: custZip }, ...prev]);
-      setCustName('');
-      setCustPhone('');
+      alert('Erro de conexão ao cadastrar cliente.');
     }
   }
 
+  // Salvar Integrações Mercado Pago & Evolution API
+  async function handleSaveIntegrations(e) {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/admin/config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          mp_environment: mpEnvironment,
+          mp_public_key: mpPublicKey,
+          mercadopago_token: mpAccessToken,
+          mp_webhook_secret: mpWebhookSecret,
+          evolution_api_url: evoUrl,
+          evolution_api_key: evoKey,
+          evolution_instance_name: evoInstance,
+          admin_phone: adminPhone
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        alert('Configurações de Mercado Pago, Evolution API e WhatsApp do Admin salvas com sucesso!');
+      } else {
+        alert('Erro ao salvar configurações.');
+      }
+    } catch (err) {
+      alert('Erro de conexão ao salvar integrações.');
+    }
+  }
+
+  // Alternar Modo 24h
   async function handleToggleModo24h() {
     const nextVal = !modo24h;
     setModo24h(nextVal);
     if (onToggleEventoMode) onToggleEventoMode(nextVal);
+
     try {
       await fetch('/api/admin/config', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ modo_24h: nextVal })
       });
     } catch (err) {
-      console.log('Modo 24h alterado localmente:', nextVal);
+      console.log('Modo 24h alterado:', nextVal);
     }
   }
 
-  async function handleToggleMpEnvironment() {
-    const nextEnv = mpEnvironment === 'sandbox' ? 'production' : 'sandbox';
-    setMpEnvironment(nextEnv);
+  // Limpar Dados de Exemplo
+  async function handleResetDemoData() {
+    if (!window.confirm('ATENÇÃO: Deseja apagar todas as ordens, fila noturna e clientes de teste para iniciar testes reais?')) return;
     try {
-      await fetch('/api/admin/config', {
+      const res = await fetch('/api/admin/reset-demo-data', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ mp_environment: nextEnv })
+        headers: { 'Authorization': `Bearer ${token}` }
       });
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message || 'Dados de teste removidos! Banco pronto para testes reais.');
+        setProductionQueue([]);
+        setCustomersList([]);
+      } else {
+        alert('Erro ao resetar dados.');
+      }
     } catch (err) {
-      console.log('Ambiente MP alterado localmente:', nextEnv);
+      alert('Erro de conexão ao solicitar reset.');
     }
   }
 
@@ -329,152 +488,346 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
   );
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-purple-500/30 rounded-2xl w-full max-w-5xl overflow-hidden shadow-2xl text-slate-100 max-h-[90vh] flex flex-col">
-        
-        {/* Header Admin */}
-        <div className="bg-gradient-to-r from-purple-900/80 to-slate-900 px-6 py-4 border-b border-purple-500/20 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-600/30 rounded-lg text-purple-400 border border-purple-500/30">
-              <Shield size={24} />
-            </div>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--light-bg)' }}>
+      
+      {/* Header Institucional da Página Admin (Full-Page) */}
+      <header style={{
+        background: 'linear-gradient(135deg, #0c1a20 0%, #173440 100%)',
+        color: '#ffffff',
+        padding: '16px 0',
+        borderBottom: '3px solid var(--secondary)',
+        boxShadow: '0 4px 14px rgba(23,52,64,0.18)'
+      }}>
+        <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <img 
+              src="/logo.png" 
+              alt="Tuta's Paper Logo" 
+              style={{
+                height: '48px',
+                width: 'auto',
+                borderRadius: '10px',
+                boxShadow: '0 3px 10px rgba(23,52,64,0.18)',
+                objectFit: 'contain',
+                background: '#9fe3eb'
+              }}
+            />
             <div>
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <h1 style={{ fontSize: '1.35rem', color: '#ffffff', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                 Painel Administrativo Tuta's Paper
-                <span className="text-xs bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded-full">
-                  Role: {userRole.toUpperCase()}
-                </span>
-              </h2>
-              <p className="text-xs text-slate-400">Gestão de Vendas, Estoque, Clientes e Integrações</p>
+                {token && (
+                  <span className="badge badge-gold" style={{ fontSize: '0.75rem', textTransform: 'uppercase' }}>
+                    Role: {userRole}
+                  </span>
+                )}
+              </h1>
+              <p style={{ fontSize: '0.82rem', color: '#cbe4e8' }}>
+                Gestão de Vendas, Estoque, Clientes e Integrações de Retaguarda
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {token && (
-              <button onClick={handleLogout} className="text-slate-400 hover:text-red-400 p-2 rounded-lg transition-colors flex items-center gap-1 text-xs">
+              <button className="btn btn-outline" onClick={handleLogout} style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)', padding: '8px 16px', fontSize: '0.85rem' }}>
                 <LogOut size={16} /> Sair
               </button>
             )}
-            <button onClick={onClose} className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2 rounded-lg text-xs font-medium">
-              Fechar
+            <button className="btn btn-secondary" onClick={onClose} style={{ padding: '8px 18px', fontSize: '0.85rem' }}>
+              Voltar ao E-commerce
             </button>
           </div>
         </div>
+      </header>
 
-        {/* Conteúdo Principal */}
-        {!token ? (
-          /* Tela de Login */
-          <div className="p-8 flex flex-col items-center justify-center min-h-[400px]">
-            <div className="w-full max-w-md bg-slate-800/50 p-6 rounded-xl border border-slate-700">
-              <h3 className="text-lg font-bold text-center mb-4 flex items-center justify-center gap-2">
-                <Lock className="text-purple-400" size={20} /> Autenticação Requerida
-              </h3>
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">E-mail de Acesso</label>
-                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500" required />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Senha</label>
-                  <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500" required />
-                </div>
-                <button type="submit" className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white py-2 rounded-lg font-semibold text-sm transition-all shadow-lg shadow-purple-900/30">
-                  Entrar no Painel
-                </button>
-              </form>
+      {/* Tela de Login Protegida */}
+      {!token ? (
+        <main className="container" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '60px 20px' }}>
+          <div className="card" style={{ maxWidth: '440px', width: '100%', padding: '36px' }}>
+            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+              <div style={{ display: 'inline-flex', padding: '16px', background: 'var(--primary-light)', borderRadius: '50%', marginBottom: '14px' }}>
+                <Lock size={32} color="var(--primary)" />
+              </div>
+              <h2 style={{ fontSize: '1.4rem', color: 'var(--primary)', fontWeight: '800' }}>Acesso Restrito ao Admin</h2>
+              <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>Digite o e-mail e senha cadastrados para acessar o painel</p>
             </div>
+
+            {loginError && (
+              <div style={{ padding: '12px 16px', background: '#fee2e2', color: '#991b1b', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <AlertTriangle size={18} /> {loginError}
+              </div>
+            )}
+
+            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>
+                  E-mail de Acesso
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="admin@tutaspapeis.com.br"
+                  style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.92rem' }}
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>
+                  Senha de Acesso
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.92rem' }}
+                  required
+                />
+              </div>
+
+              <button type="submit" className="btn btn-primary" style={{ padding: '13px', width: '100%', fontSize: '1.05rem', marginTop: '8px' }}>
+                Entrar no Painel
+              </button>
+            </form>
           </div>
-        ) : (
-          /* Painel com Abas */
-          <div className="flex-1 flex flex-col overflow-hidden">
-            {/* Navegação por Abas */}
-            <div className="flex border-b border-slate-800 bg-slate-950/60 px-6 gap-2 overflow-x-auto">
+        </main>
+      ) : (
+        /* Painel com Abas Full-Page */
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          
+          {/* Barra de Abas Responsiva */}
+          <div style={{ background: '#ffffff', borderBottom: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+            <div className="container" style={{ display: 'flex', gap: '8px', overflowX: 'auto' }}>
+              
               <button
+                className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
+                onClick={() => setActiveTab('dashboard')}
+                style={{ padding: '16px 20px', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                <LayoutDashboard size={18} /> Dashboard
+              </button>
+
+              <button
+                className={`tab-btn ${activeTab === 'production' ? 'active' : ''}`}
                 onClick={() => setActiveTab('production')}
-                className={`py-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${
-                  activeTab === 'production' ? 'border-purple-500 text-purple-400 bg-purple-500/10' : 'border-transparent text-slate-400 hover:text-slate-200'
-                }`}
+                style={{ padding: '16px 20px', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}
               >
-                <Layers size={16} /> Fila de Prensa Noturna
+                <Layers size={18} /> Fila Noturna
               </button>
 
               <button
+                className={`tab-btn ${activeTab === 'products' ? 'active' : ''}`}
                 onClick={() => setActiveTab('products')}
-                className={`py-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${
-                  activeTab === 'products' ? 'border-purple-500 text-purple-400 bg-purple-500/10' : 'border-transparent text-slate-400 hover:text-slate-200'
-                }`}
+                style={{ padding: '16px 20px', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}
               >
-                <Package size={16} /> Produtos & Estoque
+                <Package size={18} /> Produtos & Estoque
               </button>
 
               <button
+                className={`tab-btn ${activeTab === 'customers' ? 'active' : ''}`}
                 onClick={() => setActiveTab('customers')}
-                className={`py-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${
-                  activeTab === 'customers' ? 'border-purple-500 text-purple-400 bg-purple-500/10' : 'border-transparent text-slate-400 hover:text-slate-200'
-                }`}
+                style={{ padding: '16px 20px', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}
               >
-                <Users size={16} /> Clientes Compradores
+                <Users size={18} /> Clientes Compradores
               </button>
 
               {userRole === 'admin' && (
                 <button
-                  onClick={() => setActiveTab('integrations')}
-                  className={`py-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${
-                    activeTab === 'integrations' ? 'border-purple-500 text-purple-400 bg-purple-500/10' : 'border-transparent text-slate-400 hover:text-slate-200'
-                  }`}
+                  className={`tab-btn ${activeTab === 'users' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('users')}
+                  style={{ padding: '16px 20px', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}
                 >
-                  <Settings size={16} /> Modo 24h & Integrações
+                  <UserPlus size={18} /> Usuários do Admin
+                </button>
+              )}
+
+              {userRole === 'admin' && (
+                <button
+                  className={`tab-btn ${activeTab === 'integrations' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('integrations')}
+                  style={{ padding: '16px 20px', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}
+                >
+                  <Settings size={18} /> Modo 24h & Integrações
                 </button>
               )}
             </div>
+          </div>
 
-            {/* Conteúdo da Aba */}
-            <div className="flex-1 overflow-y-auto p-6">
-              {/* Aba 1: Fila de Prensa Noturna */}
-              {activeTab === 'production' && (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-bold text-slate-200">Fila Noturna de Impressão e Montagem</h3>
-                    <button onClick={fetchProductionQueue} className="text-xs text-purple-400 hover:underline flex items-center gap-1">
-                      <RefreshCw size={12} /> Atualizar Fila
-                    </button>
+          {/* Conteúdo Principal Responsivo */}
+          <div className="container" style={{ flex: 1, padding: '30px 20px' }}>
+            
+            {/* 📊 Aba 0: Dashboard Geral com Faturamento Total, Mês e Valor em Estoque */}
+            {activeTab === 'dashboard' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.5rem', color: 'var(--primary)', marginBottom: '4px' }}>Visão Geral Financeira & Estoque</h2>
+                    <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Métricas consolidadas de faturamento total, mês atual e inventário armazenado.</p>
+                  </div>
+                  <button className="btn btn-outline" onClick={fetchDashboardStats} style={{ padding: '8px 16px', fontSize: '0.9rem' }}>
+                    <RefreshCw size={16} /> Atualizar Métricas
+                  </button>
+                </div>
+
+                {/* 4 Cards de Métricas Principais (Faturamento Total, Faturamento Mês, Valor em Estoque, Clientes) */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
+                  
+                  <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '22px' }}>
+                    <div style={{ padding: '14px', background: '#dcfce7', borderRadius: '12px', color: '#166534' }}>
+                      <DollarSign size={28} />
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Faturamento Acumulado</span>
+                      <div style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--primary)' }}>
+                        R$ {dashboardStats.total_sales.toFixed(2)}
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 'bold' }}>
+                        {dashboardStats.total_orders} pedido(s) pagos
+                      </span>
+                    </div>
                   </div>
 
-                  {productionQueue.length === 0 ? (
-                    <p className="text-xs text-slate-500 text-center py-8">Nenhum pedido pendente na fila noturna.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {productionQueue.map((item, idx) => (
-                        <div key={idx} className="bg-slate-800/60 p-4 rounded-xl border border-slate-700/60 flex gap-4 items-center">
-                          <img src={item.cropped_image_url} alt="Arte HD" className="w-20 h-20 rounded-full border-2 border-purple-500/40 object-cover" />
-                          <div className="flex-1 text-xs space-y-1">
-                            <div className="font-bold text-white text-sm">{item.order_id}</div>
-                            <div className="text-slate-300 font-semibold">{item.customer_name} - {item.customer_phone}</div>
-                            <div className="text-purple-300">{item.diameter} • {item.finish_type} ({item.quantity}x)</div>
-                            <div className="text-emerald-400 font-medium">Prazo: {item.delivery_deadline}</div>
-                            <a href={item.cropped_image_url} download={`arte-${item.order_id}.png`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/30 px-2 py-1 rounded mt-1 transition-colors">
-                              <Download size={12} /> Baixar Arte HD
+                  <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '22px' }}>
+                    <div style={{ padding: '14px', background: 'var(--primary-light)', borderRadius: '12px', color: 'var(--primary)' }}>
+                      <TrendingUp size={28} />
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Faturamento Mês Atual</span>
+                      <div style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--primary)' }}>
+                        R$ {dashboardStats.monthly_sales.toFixed(2)}
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                        Mês vigente
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '22px' }}>
+                    <div style={{ padding: '14px', background: 'var(--secondary-light)', borderRadius: '12px', color: '#0e5864' }}>
+                      <Package size={28} />
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Valor Total em Estoque</span>
+                      <div style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--primary)' }}>
+                        R$ {dashboardStats.stock_monetary_value.toFixed(2)}
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: '#0e5864', fontWeight: 'bold' }}>
+                        {dashboardStats.stock_total_items} unidades para venda
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '22px' }}>
+                    <div style={{ padding: '14px', background: '#e1f7f9', borderRadius: '12px', color: '#0e5864' }}>
+                      <Users size={28} />
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Base de Clientes</span>
+                      <div style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--primary)' }}>
+                        {dashboardStats.total_customers}
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Compradores registrados</span>
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
+            )}
+
+            {/* Aba 1: Fila de Prensa Noturna (Central Única de Pedidos & WhatsApp) */}
+            {activeTab === 'production' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.5rem', color: 'var(--primary)', marginBottom: '4px' }}>Fila Noturna de Impressão e Prensa</h2>
+                    <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Baixe a imagem formatada e ao concluir o pedido, notifique o comprador no WhatsApp.</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button className="btn btn-outline" onClick={fetchProductionQueue} style={{ padding: '8px 16px', fontSize: '0.9rem' }}>
+                      <RefreshCw size={16} /> Atualizar Fila
+                    </button>
+                  </div>
+                </div>
+
+                {productionQueue.length === 0 ? (
+                  <div className="card" style={{ textAlign: 'center', padding: '50px 20px', color: '#64748b' }}>
+                    Nenhum pedido pendente na fila noturna de impressão.
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
+                    {productionQueue.map((item, idx) => (
+                      <div key={idx} className="card" style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', padding: '20px' }}>
+                        <img
+                          src={item.cropped_image_url}
+                          alt="Arte HD"
+                          style={{ width: '92px', height: '92px', borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--secondary)', boxShadow: 'var(--shadow-sm)', flexShrink: 0 }}
+                        />
+                        <div style={{ flex: 1, fontSize: '0.88rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                            <span style={{ fontWeight: '800', fontSize: '1.05rem', color: 'var(--primary)' }}>{item.order_id}</span>
+                            <span className={`badge ${item.production_status === 'completed' ? 'badge-green' : 'badge-gold'}`}>
+                              {item.production_status === 'completed' ? 'Concluído' : 'Pendente'}
+                            </span>
+                          </div>
+
+                          <div style={{ fontWeight: '600', color: '#334155', margin: '2px 0' }}>
+                            {item.customer_name} • <a href={`https://wa.me/55${item.customer_phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" style={{ color: '#0e5864', fontWeight: 'bold' }}>{item.customer_phone}</a>
+                          </div>
+
+                          <div style={{ color: '#0e5864', fontWeight: '700', margin: '6px 0' }}>
+                            {item.diameter} • {item.finish_type} ({item.quantity}x)
+                          </div>
+
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px' }}>
+                            <a
+                              href={item.cropped_image_url}
+                              download={`arte-${item.order_id}.png`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="btn btn-outline"
+                              style={{ display: 'inline-flex', padding: '6px 10px', fontSize: '0.78rem' }}
+                            >
+                              <Download size={14} /> Baixar Arte
                             </a>
+
+                            {item.production_status !== 'completed' && (
+                              <button
+                                className="btn btn-primary"
+                                onClick={() => handleCompleteOrder(item.order_id, item.customer_name)}
+                                style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+                              >
+                                <Send size={14} /> Concluir & Avisar WhatsApp
+                              </button>
+                            )}
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
-              {/* Aba 2: Produtos & Estoque */}
-              {activeTab === 'products' && (
-                <div className="space-y-6">
-                  {/* Cadastrar Novo Produto */}
-                  <form onSubmit={handleAddProduct} className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60 grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+            {/* 🖼️ Aba 2: Produtos & Estoque com Limite Máximo por Compra */}
+            {activeTab === 'products' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                
+                {/* Cadastrar Novo Produto */}
+                <form onSubmit={handleAddProduct} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: '#ffffff' }}>
+                  <h3 style={{ fontSize: '1.1rem', color: 'var(--primary)', fontWeight: '800' }}>Cadastrar Novo Produto</h3>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
                     <div>
-                      <label className="block text-xs text-slate-400 mb-1">Nome do Produto</label>
-                      <input type="text" value={prodName} onChange={e => setProdName(e.target.value)} placeholder="Ex: Botton EJC 38mm" className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" required />
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>Nome do Produto *</label>
+                      <input type="text" value={prodName} onChange={e => setProdName(e.target.value)} placeholder="Ex: Botton EJC 38mm" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} required />
                     </div>
                     <div>
-                      <label className="block text-xs text-slate-400 mb-1">Categoria</label>
-                      <select value={prodCategory} onChange={e => setProdCategory(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white">
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>Categoria</label>
+                      <select value={prodCategory} onChange={e => setProdCategory(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}>
                         <option value="Geral">Geral</option>
                         <option value="Religiosos">Religiosos</option>
                         <option value="Eventos">Eventos</option>
@@ -482,209 +835,474 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs text-slate-400 mb-1">Preço Venda (R$)</label>
-                      <input type="number" step="0.50" value={prodPrice} onChange={e => setProdPrice(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" required />
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>Preço Venda (R$)</label>
+                      <input type="number" step="0.50" value={prodPrice} onChange={e => setProdPrice(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} required />
                     </div>
                     <div>
-                      <label className="block text-xs text-slate-400 mb-1">Estoque Inicial</label>
-                      <input type="number" value={prodStock} onChange={e => setProdStock(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" required />
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>Estoque Total</label>
+                      <input type="number" value={prodStock} onChange={e => setProdStock(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} required />
                     </div>
-                    <button type="submit" className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-1.5 rounded text-xs flex items-center justify-center gap-1 transition-all">
-                      <Plus size={14} /> Adicionar
-                    </button>
-                  </form>
-
-                  {/* Tabela de Produtos */}
-                  <div className="bg-slate-800/30 rounded-xl border border-slate-700/60 overflow-hidden">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-900/80 text-slate-400 border-b border-slate-700/60 uppercase text-[10px]">
-                        <tr>
-                          <th className="p-3">Produto</th>
-                          <th className="p-3">Categoria</th>
-                          <th className="p-3">Preço (R$)</th>
-                          <th className="p-3">Estoque</th>
-                          <th className="p-3 text-right">Ação</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-800">
-                        {productsList.map(prod => (
-                          <tr key={prod.id} className="hover:bg-slate-800/40">
-                            <td className="p-3 font-semibold text-white">{prod.name}</td>
-                            <td className="p-3 text-slate-400">{prod.category || 'Geral'}</td>
-                            <td className="p-3">
-                              <input
-                                type="number"
-                                step="0.50"
-                                defaultValue={prod.base_price}
-                                onBlur={e => handleUpdateProductPriceStock(prod.id, e.target.value, prod.stock_quantity)}
-                                className="w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-emerald-400 font-bold"
-                              />
-                            </td>
-                            <td className="p-3">
-                              <input
-                                type="number"
-                                defaultValue={prod.stock_quantity || 0}
-                                onBlur={e => handleUpdateProductPriceStock(prod.id, prod.base_price, e.target.value)}
-                                className="w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-purple-300 font-bold"
-                              />
-                            </td>
-                            <td className="p-3 text-right text-slate-400">
-                              {prod.stock_quantity > 0 ? (
-                                <span className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded">Disponível</span>
-                              ) : (
-                                <span className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 px-2 py-0.5 rounded">Esgotado</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>Limite Máx. por Compra</label>
+                      <input type="number" value={prodMaxLimit} onChange={e => setProdMaxLimit(e.target.value)} placeholder="Ex: 50" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} required />
+                    </div>
                   </div>
-                </div>
-              )}
 
-              {/* Aba 3: Clientes Compradores */}
-              {activeTab === 'customers' && (
-                <div className="space-y-6">
-                  {/* Cadastrar Cliente */}
-                  <form onSubmit={handleAddCustomer} className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60 space-y-3">
-                    <h4 className="text-xs font-bold text-purple-300 uppercase flex items-center gap-1">
-                      <Users size={14} /> Novo Cadastro de Cliente
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <input type="text" value={custName} onChange={e => setCustName(e.target.value)} placeholder="Nome Completo *" className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" required />
-                      <input type="text" value={custPhone} onChange={e => setCustPhone(e.target.value)} placeholder="Telefone / WhatsApp *" className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" required />
-                      <input type="text" value={custCpf} onChange={e => setCustCpf(e.target.value)} placeholder="CPF (Opcional)" className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                      <input type="text" value={custStreet} onChange={e => setCustStreet(e.target.value)} placeholder="Rua / Logradouro" className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" />
-                      <input type="text" value={custNumber} onChange={e => setCustNumber(e.target.value)} placeholder="Número / Bairro" className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" />
-                      <input type="text" value={custCity} onChange={e => setCustCity(e.target.value)} placeholder="Cidade / Estado" className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" />
-                      <button type="submit" className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-1.5 rounded text-xs transition-all">
-                        Salvar Cliente
-                      </button>
-                    </div>
-                  </form>
+                  {/* Upload de Imagem Físico + URL */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>
+                      Foto do Produto (Upload de Arquivo ou URL)
+                    </label>
+                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <label className="btn btn-outline" style={{ cursor: 'pointer', padding: '10px 16px', fontSize: '0.88rem', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                        <Upload size={16} /> {uploadingImage ? 'Enviando Foto...' : 'Upload de Arquivo de Foto'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleProductFileUpload}
+                          style={{ display: 'none' }}
+                          disabled={uploadingImage}
+                        />
+                      </label>
 
-                  {/* Filtro e Tabela de Clientes */}
-                  <div className="flex justify-between items-center">
-                    <h4 className="text-xs font-bold text-slate-300">Clientes Cadastrados ({filteredCustomers.length})</h4>
-                    <div className="relative w-64">
-                      <Search size={14} className="absolute left-2.5 top-2.5 text-slate-500" />
+                      <span style={{ fontSize: '0.85rem', color: '#64748b' }}>ou cole a URL:</span>
+
                       <input
-                        type="text"
-                        placeholder="Buscar cliente ou telefone..."
-                        value={customerSearch}
-                        onChange={e => setCustomerSearch(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white"
+                        type="url"
+                        value={prodImg}
+                        onChange={e => setProdImg(e.target.value)}
+                        placeholder="https://exemplo.com/imagem-produto.jpg"
+                        style={{ flex: 1, minWidth: '220px', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}
                       />
+
+                      {prodImg && (
+                        <img
+                          src={prodImg}
+                          alt="Prévia"
+                          style={{ width: '44px', height: '44px', borderRadius: '8px', objectFit: 'cover', border: '2px solid var(--secondary)' }}
+                        />
+                      )}
                     </div>
                   </div>
 
-                  <div className="bg-slate-800/30 rounded-xl border border-slate-700/60 overflow-hidden">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-900/80 text-slate-400 border-b border-slate-700/60 uppercase text-[10px]">
-                        <tr>
-                          <th className="p-3">Cliente</th>
-                          <th className="p-3">Telefone</th>
-                          <th className="p-3">CPF</th>
-                          <th className="p-3">Endereço Completo</th>
+                  <div>
+                    <button type="submit" className="btn btn-primary" style={{ padding: '10px 20px', fontSize: '0.95rem' }}>
+                      <Plus size={18} /> Adicionar Produto ao Catálogo
+                    </button>
+                  </div>
+                </form>
+
+                {/* Tabela de Produtos Responsiva com Limite por Compra */}
+                <div className="card table-responsive" style={{ padding: 0, overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', textAlign: 'left' }}>
+                    <thead style={{ background: 'var(--primary-light)', color: 'var(--primary)', textTransform: 'uppercase', fontSize: '0.78rem' }}>
+                      <tr>
+                        <th style={{ padding: '14px 20px' }}>Foto</th>
+                        <th style={{ padding: '14px 20px' }}>Produto</th>
+                        <th style={{ padding: '14px 20px' }}>Categoria</th>
+                        <th style={{ padding: '14px 20px' }}>Preço (R$)</th>
+                        <th style={{ padding: '14px 20px' }}>Estoque Total</th>
+                        <th style={{ padding: '14px 20px' }}>Máx / Compra</th>
+                        <th style={{ padding: '14px 20px', textAlign: 'right' }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productsList.map(prod => (
+                        <tr key={prod.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <td style={{ padding: '10px 20px' }}>
+                            <img
+                              src={prod.image_url}
+                              alt={prod.name}
+                              style={{ width: '40px', height: '40px', borderRadius: '6px', objectFit: 'cover' }}
+                              onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=500&auto=format&fit=crop&q=60'; }}
+                            />
+                          </td>
+                          <td style={{ padding: '14px 20px', fontWeight: '700', color: '#0f172a' }}>{prod.name}</td>
+                          <td style={{ padding: '14px 20px', color: '#64748b' }}>{prod.category || 'Geral'}</td>
+                          <td style={{ padding: '14px 20px' }}>
+                            <input
+                              type="number"
+                              step="0.50"
+                              defaultValue={prod.base_price}
+                              onBlur={e => handleUpdateProductPriceStock(prod.id, e.target.value, prod.stock_quantity, prod.max_limit_per_order)}
+                              style={{ width: '85px', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 'bold', color: 'var(--primary)' }}
+                            />
+                          </td>
+                          <td style={{ padding: '14px 20px' }}>
+                            <input
+                              type="number"
+                              defaultValue={prod.stock_quantity || 0}
+                              onBlur={e => handleUpdateProductPriceStock(prod.id, prod.base_price, e.target.value, prod.max_limit_per_order)}
+                              style={{ width: '75px', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 'bold' }}
+                            />
+                          </td>
+                          <td style={{ padding: '14px 20px' }}>
+                            <input
+                              type="number"
+                              defaultValue={prod.max_limit_per_order || 100}
+                              onBlur={e => handleUpdateProductPriceStock(prod.id, prod.base_price, prod.stock_quantity, e.target.value)}
+                              style={{ width: '75px', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 'bold' }}
+                            />
+                          </td>
+                          <td style={{ padding: '14px 20px', textAlign: 'right' }}>
+                            {prod.stock_quantity > 0 ? (
+                              <span className="badge badge-green">Disponível</span>
+                            ) : (
+                              <span className="badge" style={{ background: '#fee2e2', color: '#991b1b' }}>Esgotado</span>
+                            )}
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-800">
-                        {filteredCustomers.map(cust => (
-                          <tr key={cust.id} className="hover:bg-slate-800/40">
-                            <td className="p-3 font-semibold text-white flex items-center gap-2">
-                              <Users size={14} className="text-purple-400" /> {cust.name}
-                            </td>
-                            <td className="p-3 text-purple-300 font-medium">{cust.phone}</td>
-                            <td className="p-3 text-slate-400">{cust.cpf || 'Não informado'}</td>
-                            <td className="p-3 text-slate-300 flex items-center gap-1">
-                              <MapPin size={12} className="text-slate-500 shrink-0" />
-                              {cust.street ? `${cust.street}, ${cust.number} - ${cust.neighborhood}, ${cust.city}/${cust.state}` : 'Sem endereço registrado'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* Aba 4: Modo 24h & Integrações (Somente Admin) */}
-              {activeTab === 'integrations' && userRole === 'admin' && (
-                <div className="space-y-6">
-                  {/* Seção Modo 24h */}
-                  <div className="bg-purple-950/40 border border-purple-500/40 p-5 rounded-xl flex items-center justify-between">
-                    <div>
-                      <h4 className="text-base font-bold text-white flex items-center gap-2">
-                        <Zap className="text-yellow-400 fill-yellow-400" size={18} /> Modo 24h (Entrega Expressa)
-                      </h4>
-                      <p className="text-xs text-purple-200 mt-1 max-w-xl">
-                        Quando ATIVO: Oculta a opção de personalizar bottons no e-commerce, vende apenas produtos prontos do catálogo e altera a frase do hero da loja.
-                      </p>
-                    </div>
-                    <button
-                      onClick={handleToggleModo24h}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-all shadow-lg ${
-                        modo24h ? 'bg-yellow-500 text-black hover:bg-yellow-400 shadow-yellow-500/20' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                      }`}
-                    >
-                      {modo24h ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
-                      {modo24h ? 'MODO 24h ATIVO' : 'MODO PADRÃO'}
+            {/* Aba 3: Clientes Compradores */}
+            {activeTab === 'customers' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                
+                {/* Cadastrar Cliente */}
+                <form onSubmit={handleAddCustomer} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <h4 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Users size={18} /> Novo Cadastro de Cliente Comprador
+                  </h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+                    <input type="text" value={custName} onChange={e => setCustName(e.target.value)} placeholder="Nome Completo *" style={{ padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} required />
+                    <input type="text" value={custPhone} onChange={e => setCustPhone(e.target.value)} placeholder="Telefone / WhatsApp *" style={{ padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} required />
+                    <input type="text" value={custCpf} onChange={e => setCustCpf(e.target.value)} placeholder="CPF (Opcional)" style={{ padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                    <input type="text" value={custStreet} onChange={e => setCustStreet(e.target.value)} placeholder="Rua / Logradouro" style={{ padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} />
+                    <input type="text" value={custNumber} onChange={e => setCustNumber(e.target.value)} placeholder="Número / Bairro" style={{ padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} />
+                    <input type="text" value={custCity} onChange={e => setCustCity(e.target.value)} placeholder="Cidade / Estado" style={{ padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} />
+                    <button type="submit" className="btn btn-primary" style={{ padding: '10px 20px', fontSize: '0.95rem' }}>
+                      Salvar Cliente
                     </button>
                   </div>
+                </form>
 
-                  {/* Seção Mercado Pago Sandbox / Produção */}
-                  <div className="bg-slate-800/40 border border-slate-700/60 p-5 rounded-xl flex items-center justify-between">
-                    <div>
-                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                        <CreditCard className="text-sky-400" size={18} /> Mercado Pago Environment
-                      </h4>
-                      <p className="text-xs text-slate-400 mt-1">
-                        Ambiente atual: <strong className="text-sky-300">{mpEnvironment.toUpperCase()}</strong>. Troque entre Sandbox (Testes) e Produção.
-                      </p>
-                    </div>
-                    <button
-                      onClick={handleToggleMpEnvironment}
-                      className={`px-4 py-2 rounded-xl font-bold text-xs border transition-all ${
-                        mpEnvironment === 'sandbox'
-                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
-                          : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
-                      }`}
-                    >
-                      {mpEnvironment === 'sandbox' ? '🧪 Ambiente: SANDBOX' : '🚀 Ambiente: PRODUÇÃO'}
-                    </button>
-                  </div>
-
-                  {/* Chaves de Integração */}
-                  <div className="bg-slate-800/30 p-5 rounded-xl border border-slate-700/60 space-y-4">
-                    <h4 className="text-xs font-bold text-slate-300 uppercase flex items-center gap-2">
-                      <Key size={14} className="text-purple-400" /> Evolution API & Chaves de Integração
+                {/* Tabela de Clientes Responsiva com Botão Excluir */}
+                <div className="card table-responsive" style={{ padding: 0, overflow: 'hidden' }}>
+                  <div style={{ padding: '18px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--primary-light)', flexWrap: 'wrap', gap: '12px' }}>
+                    <h4 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--primary)' }}>
+                      Clientes Cadastrados ({filteredCustomers.length})
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    <input
+                      type="text"
+                      placeholder="Buscar cliente ou telefone..."
+                      value={customerSearch}
+                      onChange={e => setCustomerSearch(e.target.value)}
+                      style={{ padding: '8px 14px', borderRadius: '20px', border: '1px solid #cbd5e1', fontSize: '0.88rem', width: '250px' }}
+                    />
+                  </div>
+
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', textAlign: 'left' }}>
+                    <thead style={{ background: '#f8fafc', color: '#64748b', textTransform: 'uppercase', fontSize: '0.78rem', borderBottom: '1px solid #e2e8f0' }}>
+                      <tr>
+                        <th style={{ padding: '14px 20px' }}>Cliente</th>
+                        <th style={{ padding: '14px 20px' }}>Telefone / WhatsApp</th>
+                        <th style={{ padding: '14px 20px' }}>CPF</th>
+                        <th style={{ padding: '14px 20px' }}>Endereço Completo</th>
+                        <th style={{ padding: '14px 20px', textAlign: 'right' }}>Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredCustomers.map(cust => (
+                        <tr key={cust.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <td style={{ padding: '14px 20px', fontWeight: '700', color: 'var(--primary)' }}>{cust.name}</td>
+                          <td style={{ padding: '14px 20px', color: '#0e5864', fontWeight: '600' }}>{cust.phone}</td>
+                          <td style={{ padding: '14px 20px', color: '#64748b' }}>{cust.cpf || 'Não informado'}</td>
+                          <td style={{ padding: '14px 20px', color: '#334155' }}>
+                            {cust.street ? `${cust.street}, ${cust.number} - ${cust.city}` : 'Sem endereço registrado'}
+                          </td>
+                          <td style={{ padding: '14px 20px', textAlign: 'right' }}>
+                            <button
+                              className="btn btn-outline"
+                              onClick={() => handleDeleteCustomer(cust.id, cust.name)}
+                              style={{ color: '#ef4444', borderColor: '#fca5a5', padding: '6px 12px', fontSize: '0.8rem' }}
+                              title="Excluir Cliente"
+                            >
+                              <Trash2 size={14} /> Excluir
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Aba 4: Gestão de Usuários do Admin (Admin Master) */}
+            {activeTab === 'users' && userRole === 'admin' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                
+                {/* Form de Cadastro de Usuário do Admin */}
+                <form onSubmit={handleAddAdminUser} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: '#ffffff' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h3 style={{ fontSize: '1.1rem', color: 'var(--primary)', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <UserPlus size={20} color="var(--primary)" /> Cadastrar Usuário do Admin
+                    </h3>
+                    <span className="badge badge-gold">Admin Master</span>
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>Nome Completo *</label>
+                      <input type="text" value={newAdminName} onChange={e => setNewAdminName(e.target.value)} placeholder="Ex: Maria Atendente" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} required />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>E-mail de Login *</label>
+                      <input type="email" value={newAdminEmail} onChange={e => setNewAdminEmail(e.target.value)} placeholder="atendente@tutaspapeis.com.br" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} required />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>Senha *</label>
+                      <input type="password" value={newAdminPassword} onChange={e => setNewAdminPassword(e.target.value)} placeholder="••••••••" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} required />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>Nível de Permissão</label>
+                      <select value={newAdminRole} onChange={e => setNewAdminRole(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}>
+                        <option value="funcionario">Funcionário (Fila & Pedidos)</option>
+                        <option value="admin">Administrador Master (Acesso Total)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <button type="submit" className="btn btn-primary" style={{ padding: '10px 20px', fontSize: '0.95rem' }}>
+                      <UserPlus size={16} /> Criar Usuário do Admin
+                    </button>
+                  </div>
+                </form>
+
+                {/* Tabela de Usuários Administrativos */}
+                <div className="card table-responsive" style={{ padding: 0, overflow: 'hidden' }}>
+                  <div style={{ padding: '18px 24px', background: 'var(--primary-light)' }}>
+                    <h4 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--primary)' }}>
+                      Usuários do Sistema ({adminUsersList.length})
+                    </h4>
+                  </div>
+
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', textAlign: 'left' }}>
+                    <thead style={{ background: '#f8fafc', color: '#64748b', textTransform: 'uppercase', fontSize: '0.78rem', borderBottom: '1px solid #e2e8f0' }}>
+                      <tr>
+                        <th style={{ padding: '14px 20px' }}>Usuário</th>
+                        <th style={{ padding: '14px 20px' }}>E-mail</th>
+                        <th style={{ padding: '14px 20px' }}>Perfil</th>
+                        <th style={{ padding: '14px 20px' }}>Status</th>
+                        <th style={{ padding: '14px 20px', textAlign: 'right' }}>Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adminUsersList.map(u => (
+                        <tr key={u.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <td style={{ padding: '14px 20px', fontWeight: '700', color: 'var(--primary)' }}>{u.name}</td>
+                          <td style={{ padding: '14px 20px', color: '#475569' }}>{u.email}</td>
+                          <td style={{ padding: '14px 20px' }}>
+                            <span className={`badge ${u.role === 'admin' ? 'badge-gold' : 'badge-primary'}`} style={{ textTransform: 'uppercase', fontSize: '0.75rem' }}>
+                              {u.role === 'admin' ? 'ADMIN MASTER' : 'FUNCIONÁRIO'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '14px 20px' }}>
+                            <span className="badge badge-green">Ativo</span>
+                          </td>
+                          <td style={{ padding: '14px 20px', textAlign: 'right' }}>
+                            <button
+                              className="btn btn-outline"
+                              onClick={() => handleDeleteAdminUser(u.id, u.name)}
+                              style={{ color: '#ef4444', borderColor: '#fca5a5', padding: '6px 12px', fontSize: '0.8rem' }}
+                              title="Excluir Usuário"
+                            >
+                              <Trash2 size={14} /> Excluir
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Aba 5: Integrações Separadas (Mercado Pago & Evolution API) & WhatsApp Admin */}
+            {activeTab === 'integrations' && userRole === 'admin' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                
+                <form onSubmit={handleSaveIntegrations} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  
+                  {/* Seção A: Mercado Pago (Homologação & Produção) */}
+                  <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', border: '1px solid #bcecf0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                       <div>
-                        <label className="block text-slate-400 mb-1">Evolution API Endpoint</label>
-                        <input type="text" value={evoUrl} readOnly className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-slate-300" />
+                        <h3 style={{ fontSize: '1.2rem', color: 'var(--primary)', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <CreditCard size={22} color="var(--primary)" /> Integração Mercado Pago (Pix & Cartão)
+                        </h3>
+                        <p style={{ fontSize: '0.88rem', color: '#64748b', marginTop: '2px' }}>
+                          Defina as chaves da sua conta Mercado Pago para ativação do Checkout Transparente Pix.
+                        </p>
                       </div>
-                      <div>
-                        <label className="block text-slate-400 mb-1">Mercado Pago Access Token</label>
-                        <input type="password" value={mpToken} readOnly className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-slate-300" />
+
+                      {/* Alternador Sandbox / Produção */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: '700', color: mpEnvironment === 'sandbox' ? '#0e5864' : '#166534' }}>
+                          Modo: {mpEnvironment === 'sandbox' ? '🧪 HOMOLOGAÇÃO (SANDBOX)' : '🚀 PRODUÇÃO (REAL)'}
+                        </span>
+                        <button
+                          type="button"
+                          className={`btn ${mpEnvironment === 'sandbox' ? 'btn-outline' : 'btn-secondary'}`}
+                          onClick={() => setMpEnvironment(mpEnvironment === 'sandbox' ? 'production' : 'sandbox')}
+                          style={{ padding: '8px 16px', fontSize: '0.85rem' }}
+                        >
+                          Alternar para {mpEnvironment === 'sandbox' ? 'PRODUÇÃO' : 'SANDBOX'}
+                        </button>
                       </div>
                     </div>
 
-                    <div className="pt-2">
-                      <a href={`${evoUrl}/manager`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2 rounded-lg text-xs transition-colors">
-                        <ExternalLink size={14} /> Abrir Evolution Manager (WhatsApp QR Code)
+                    <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#334155' }}>
+                      💡 <strong>Como vincular o Mercado Pago:</strong> Acesse seu painel no <a href="https://www.mercadopago.com.br/developers" target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>Mercado Pago Developers</a> e copie as chaves da sua aplicação.
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>
+                          Mercado Pago Access Token *
+                        </label>
+                        <input
+                          type="password"
+                          value={mpAccessToken}
+                          onChange={e => setMpAccessToken(e.target.value)}
+                          placeholder="APP_USR-xxxxxxxxx..."
+                          style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>
+                          Mercado Pago Public Key
+                        </label>
+                        <input
+                          type="text"
+                          value={mpPublicKey}
+                          onChange={e => setMpPublicKey(e.target.value)}
+                          placeholder="APP_USR-xxxxxxxxx..."
+                          style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>
+                          Mercado Pago Webhook Secret (Notificação Pix)
+                        </label>
+                        <input
+                          type="password"
+                          value={mpWebhookSecret}
+                          onChange={e => setMpWebhookSecret(e.target.value)}
+                          placeholder="Secret do Webhook de confirmação Pix"
+                          style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Seção B: Evolution API (WhatsApp Notifications) */}
+                  <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <h3 style={{ fontSize: '1.2rem', color: 'var(--primary)', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <MessageSquare size={22} color="var(--primary)" /> Integração Evolution API & Alertas WhatsApp
+                    </h3>
+                    <p style={{ fontSize: '0.88rem', color: '#64748b' }}>
+                      Envio de comprovantes PDF e avisos automáticos de produção via WhatsApp.
+                    </p>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>API Endpoint URL</label>
+                        <input type="text" value={evoUrl} onChange={e => setEvoUrl(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }} />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>API Key</label>
+                        <input type="password" value={evoKey} onChange={e => setEvoKey(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }} />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>Nome da Instância</label>
+                        <input type="text" value={evoInstance} onChange={e => setEvoInstance(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }} />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>WhatsApp do Admin/Produção (para Alerta de Novos Pedidos)</label>
+                        <input type="text" value={adminPhone} onChange={e => setAdminPhone(e.target.value)} placeholder="Ex: 83999887766" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <a href={`${evoUrl}/manager`} target="_blank" rel="noreferrer" className="btn btn-secondary" style={{ display: 'inline-flex', fontSize: '0.88rem' }}>
+                        <ExternalLink size={16} /> Abrir Evolution Manager (Conectar QR Code WhatsApp)
                       </a>
                     </div>
                   </div>
+
+                  {/* Seção C: Modo 24h & Operação */}
+                  <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--secondary-light)', border: '1px solid #bcecf0', flexWrap: 'wrap', gap: '16px' }}>
+                    <div>
+                      <h4 style={{ fontSize: '1.1rem', color: '#0e5864', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Zap size={20} color="var(--primary)" /> Modo 24h (Entrega Expressa Noturna)
+                      </h4>
+                      <p style={{ fontSize: '0.88rem', color: '#173440', marginTop: '4px', maxWidth: '650px' }}>
+                        Quando ATIVO: Oculta personalização no e-commerce e foca apenas nos produtos prontos do catálogo para postagem expressa.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleToggleModo24h}
+                      className={`btn ${modo24h ? 'btn-primary' : 'btn-outline'}`}
+                      style={{ padding: '10px 20px', fontSize: '0.9rem' }}
+                    >
+                      {modo24h ? '⚡ MODO 24h ATIVO' : 'MODO PADRÃO'}
+                    </button>
+                  </div>
+
+                  <div>
+                    <button type="submit" className="btn btn-primary" style={{ padding: '12px 24px', fontSize: '1rem' }}>
+                      Salvar Todas as Configurações de Integração
+                    </button>
+                  </div>
+                </form>
+
+                {/* Seção de Limpeza / Reset para Teste Real */}
+                <div className="card" style={{ border: '1px solid #fca5a5', background: '#fff5f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                  <div>
+                    <h4 style={{ fontSize: '1rem', color: '#991b1b', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Trash2 size={18} color="#991b1b" /> Limpar Dados de Exemplo (Reset de Teste Real)
+                    </h4>
+                    <p style={{ fontSize: '0.85rem', color: '#7f1d1d', marginTop: '4px' }}>
+                      Remove pedidos, clientes e ordens de teste para que você possa cadastrar dados reais e testar a integração completa.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={handleResetDemoData}
+                    style={{ background: '#dc2626', color: '#ffffff', padding: '10px 18px', fontSize: '0.88rem' }}
+                  >
+                    Limpar Dados de Teste
+                  </button>
                 </div>
-              )}
-            </div>
+
+              </div>
+            )}
+
           </div>
-        )}
-      </div>
+        </main>
+      )}
+
+      {/* Footer da Página Admin */}
+      <footer style={{ background: 'var(--dark)', color: '#94a3b8', padding: '30px 0 20px', borderTop: '1px solid #142832', marginTop: 'auto' }}>
+        <div className="container" style={{ textAlign: 'center', fontSize: '0.85rem' }}>
+          © 2026 Tuta's Paper. Painel Administrativo de Retaguarda • Todos os direitos reservados.
+        </div>
+      </footer>
+
     </div>
   );
 }

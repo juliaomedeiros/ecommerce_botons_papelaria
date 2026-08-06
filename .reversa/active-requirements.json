@@ -4,13 +4,14 @@
   "feature-id": "002",
   "short-name": "admin-estoque-seguranca",
   "started-at": "2026-07-30T16:53:00-03:00",
-  "current-stage": "coding",
+  "current-stage": "done",
   "stages-completed": [
     "requirements",
     "clarify",
     "plan",
     "to-do",
-    "coding"
+    "coding",
+    "sync"
   ],
   "paused-features": []
 }

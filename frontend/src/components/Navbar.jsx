@@ -5,24 +5,25 @@ export default function Navbar({ activeTab, setActiveTab, cartCount, openCart, o
   return (
     <header className="glass-header">
       <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', cursor: 'pointer' }} onClick={() => setActiveTab('catalog')}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => setActiveTab('catalog')}>
           <img 
             src="/logo.png" 
             alt="Tuta's Paper Logo" 
             style={{
-              height: '54px',
+              height: '46px',
               width: 'auto',
-              borderRadius: '12px',
+              borderRadius: '10px',
               boxShadow: '0 3px 10px rgba(23,52,64,0.18)',
               objectFit: 'contain',
-              background: '#9fe3eb'
+              background: '#9fe3eb',
+              flexShrink: 0
             }}
           />
           <div>
-            <h1 style={{ fontSize: '1.45rem', lineHeight: '1.2', color: 'var(--primary)', fontWeight: '800', letterSpacing: '-0.3px' }}>
+            <h1 style={{ fontSize: '1.25rem', lineHeight: '1.2', color: 'var(--primary)', fontWeight: '800', letterSpacing: '-0.3px' }}>
               Tuta's Paper
             </h1>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '600' }}>
               Papelaria • Religiosos • Bottons
             </span>
           </div>

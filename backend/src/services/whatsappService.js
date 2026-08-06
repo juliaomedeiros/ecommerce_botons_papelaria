@@ -11,6 +11,14 @@ let isProcessingQueue = false;
  * @param {string} messageText 
  * @param {string} [mediaUrl] 
  */
+function sendTextMessage(phone, messageText, mediaUrl) {
+  return new Promise((resolve) => {
+    messageQueue.push({ phone, messageText, mediaUrl, isDocument: false, resolve });
+    console.log(`📥 [WhatsApp Anti-Ban Queue] Mensagem enfileirada para ${phone}. Posição na fila: ${messageQueue.length}`);
+    processQueue();
+  });
+}
+
 /**
  * Enfileira documento PDF no WhatsApp com Proteção Anti-Ban
  * @param {string} phone 

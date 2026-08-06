@@ -4,15 +4,17 @@ const bcrypt = require('bcryptjs');
 async function runSeed() {
   console.log('🌱 Executando Seed de dados iniciais...');
   try {
-    // 1. Admin Padrão
     const adminExists = await db.query('SELECT id FROM admin_users WHERE email = $1', ['admin@tutaspapeis.com.br']);
     if (adminExists.rows.length === 0) {
       const hash = await bcrypt.hash('admin123', 10);
       await db.query(`
-        INSERT INTO admin_users (id, name, email, password_hash)
-        VALUES ('admin-uuid-001', 'Administrador Tutas', 'admin@tutaspapeis.com.br', $1)
+        INSERT INTO admin_users (id, name, email, password_hash, role)
+        VALUES ('admin-uuid-001', 'Administrador Tutas', 'admin@tutaspapeis.com.br', $1, 'admin')
       `, [hash]);
-      console.log('👤 Usuário Administrador de fábrica criado: admin@tutaspapeis.com.br / admin123');
+      console.log('👤 Usuário Administrador de fábrica criado: admin@tutaspapeis.com.br / admin123 (role: admin)');
+    } else {
+      await db.query(`UPDATE admin_users SET role = 'admin' WHERE email = $1`, ['admin@tutaspapeis.com.br']);
+      console.log('👤 Usuário admin@tutaspapeis.com.br atualizado com role = admin');
     }
 
     // 2. Categorias Iniciais

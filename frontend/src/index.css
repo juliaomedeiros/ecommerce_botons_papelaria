@@ -1,3 +1,8 @@
+@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   --font-heading: 'Outfit', sans-serif;
   --font-body: 'Plus Jakarta Sans', sans-serif;
@@ -214,6 +219,69 @@ h1, h2, h3, h4, h5, h6 {
 /* Responsive grid */
 .grid-3 {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 24px;
 }
+
+/* Responsive Table Container */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Media Queries para Smartphones e Tablets */
+@media (max-width: 768px) {
+  .container {
+    padding: 0 14px;
+  }
+  .modal-overlay {
+    padding: 10px;
+  }
+  .modal-content {
+    padding: 20px 16px;
+    border-radius: 14px;
+    max-height: 94vh;
+  }
+  .tabs-nav {
+    overflow-x: auto;
+    white-space: nowrap;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .tab-btn {
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+  }
+  .grid-3 {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    padding: 16px;
+    border-radius: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 0 10px;
+  }
+  .modal-overlay {
+    padding: 8px;
+  }
+  .modal-content {
+    padding: 16px 12px;
+    border-radius: 12px;
+  }
+  .btn {
+    padding: 10px 14px;
+    font-size: 0.88rem;
+  }
+  .grid-3 {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+}
+

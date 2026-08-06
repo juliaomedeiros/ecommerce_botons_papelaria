@@ -74,7 +74,7 @@ async function getProducts(req, res) {
 // Criar produto (Admin e Funcionário)
 async function createProduct(req, res) {
   try {
-    const { category_id, name, description, base_price, custom_upload_fee, is_customizable, stock_quantity, image_url } = req.body;
+    const { category_id, name, description, base_price, custom_upload_fee, is_customizable, stock_quantity, max_limit_per_order, image_url } = req.body;
     if (!name || base_price === undefined) {
       return res.status(400).json({ error: 'Nome e preço base são obrigatórios.' });
     }
@@ -83,8 +83,8 @@ async function createProduct(req, res) {
     const id = `prod-${Date.now()}`;
 
     const result = await db.query(`
-      INSERT INTO products (id, category_id, name, slug, description, base_price, custom_upload_fee, is_customizable, stock_quantity, image_url)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *
+      INSERT INTO products (id, category_id, name, slug, description, base_price, custom_upload_fee, is_customizable, stock_quantity, max_limit_per_order, image_url)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *
     `, [
       id,
       category_id || null,
@@ -95,6 +95,7 @@ async function createProduct(req, res) {
       custom_upload_fee || 0,
       is_customizable || false,
       stock_quantity !== undefined ? stock_quantity : 10,
+      max_limit_per_order !== undefined ? max_limit_per_order : 100,
       image_url || null
     ]);
 
@@ -109,7 +110,7 @@ async function createProduct(req, res) {
 async function updateProduct(req, res) {
   try {
     const { id } = req.params;
-    const { name, description, base_price, custom_upload_fee, is_customizable, stock_quantity, image_url, is_active, category_id } = req.body;
+    const { name, description, base_price, custom_upload_fee, is_customizable, stock_quantity, max_limit_per_order, image_url, is_active, category_id } = req.body;
 
     const currentRes = await db.query('SELECT * FROM products WHERE id = $1', [id]);
     if (currentRes.rows.length === 0) {
@@ -124,6 +125,7 @@ async function updateProduct(req, res) {
     const updatedFee = custom_upload_fee !== undefined ? custom_upload_fee : current.custom_upload_fee;
     const updatedCustom = is_customizable !== undefined ? is_customizable : current.is_customizable;
     const updatedStock = stock_quantity !== undefined ? stock_quantity : current.stock_quantity;
+    const updatedMaxLimit = max_limit_per_order !== undefined ? max_limit_per_order : current.max_limit_per_order;
     const updatedImage = image_url !== undefined ? image_url : current.image_url;
     const updatedActive = is_active !== undefined ? is_active : current.is_active;
     const updatedCat = category_id !== undefined ? category_id : current.category_id;
@@ -131,9 +133,9 @@ async function updateProduct(req, res) {
     const result = await db.query(`
       UPDATE products
       SET name = $1, description = $2, base_price = $3, custom_upload_fee = $4,
-          is_customizable = $5, stock_quantity = $6, image_url = $7, is_active = $8, category_id = $9
-      WHERE id = $10 RETURNING *
-    `, [updatedName, updatedDesc, updatedPrice, updatedFee, updatedCustom, updatedStock, updatedImage, updatedActive, updatedCat, id]);
+          is_customizable = $5, stock_quantity = $6, max_limit_per_order = $7, image_url = $8, is_active = $9, category_id = $10
+      WHERE id = $11 RETURNING *
+    `, [updatedName, updatedDesc, updatedPrice, updatedFee, updatedCustom, updatedStock, updatedMaxLimit, updatedImage, updatedActive, updatedCat, id]);
 
     return res.json(result.rows[0]);
   } catch (error) {
