@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, Layers, Calendar, Download, CheckCircle, RefreshCw, LogOut, Plus, Zap, Settings, ExternalLink, MessageSquare, CreditCard, Key, Globe, Shield, ArrowLeft, Users, Package, ShoppingBag, ToggleLeft, ToggleRight, Search, MapPin, Trash2, UserPlus, ShieldAlert, Check, AlertTriangle, Eye, EyeOff, LayoutDashboard, DollarSign, TrendingUp, Upload, Image as ImageIcon, Send, PhoneCall } from 'lucide-react';
+import { Lock, Layers, Calendar, Download, CheckCircle, RefreshCw, LogOut, Plus, Zap, Settings, ExternalLink, MessageSquare, CreditCard, Key, Globe, Shield, ArrowLeft, Users, Package, ShoppingBag, ToggleLeft, ToggleRight, Search, MapPin, Trash2, UserPlus, ShieldAlert, Check, AlertTriangle, Eye, EyeOff, LayoutDashboard, DollarSign, TrendingUp, Upload, Image as ImageIcon, Send, PhoneCall, Edit2, Save, XCircle } from 'lucide-react';
 
 export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMode, onClose }) {
   const [token, setToken] = useState(localStorage.getItem('tutas_token') || '');
@@ -40,11 +40,19 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
   // Form de Produto
   const [prodName, setProdName] = useState('');
   const [prodCategory, setProdCategory] = useState('Geral');
+  const [prodCategoryId, setProdCategoryId] = useState('');
+  const [categoriesList, setCategoriesList] = useState([]);
   const [prodPrice, setProdPrice] = useState('15.00');
   const [prodStock, setProdStock] = useState('20');
   const [prodMaxLimit, setProdMaxLimit] = useState('100');
   const [prodImg, setProdImg] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Estados para edição via Lápis na tabela
+  const [editingProdId, setEditingProdId] = useState(null);
+  const [editPrice, setEditPrice] = useState('');
+  const [editStock, setEditStock] = useState('');
+  const [editMaxLimit, setEditMaxLimit] = useState('');
 
   // Form de Cliente
   const [custName, setCustName] = useState('');
@@ -116,11 +124,29 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
     if (token) {
       if (activeTab === 'dashboard') fetchDashboardStats();
       if (activeTab === 'production') fetchProductionQueue();
-      if (activeTab === 'products') fetchProducts();
+      if (activeTab === 'products') {
+        fetchCategories();
+        fetchProducts();
+      }
       if (activeTab === 'customers') fetchCustomers();
       if (activeTab === 'users' && userRole === 'admin') fetchAdminUsers();
     }
   }, [token, activeTab]);
+
+  async function fetchCategories() {
+    try {
+      const res = await fetch('/api/categories');
+      if (res.ok) {
+        const data = await res.json();
+        setCategoriesList(data);
+        if (data.length > 0 && !prodCategoryId) {
+          setProdCategoryId(data[0].id);
+        }
+      }
+    } catch (err) {
+      console.log('Erro ao carregar categorias:', err.message);
+    }
+  }
 
   async function fetchDashboardStats() {
     try {
@@ -320,13 +346,21 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
   // Cadastrar Produto com Imagem e Limite Máximo por Compra
   async function handleAddProduct(e) {
     e.preventDefault();
+    const stockVal = parseInt(prodStock) || 0;
+    const maxLimitVal = parseInt(prodMaxLimit) || 0;
+
+    if (maxLimitVal > stockVal) {
+      alert(`Erro de Validação: O limite máximo por compra (${maxLimitVal}) não pode ser maior do que o estoque total disponível (${stockVal}).`);
+      return;
+    }
+
     try {
       const payload = {
         name: prodName,
-        category_id: null,
+        category_id: prodCategoryId || null,
         base_price: parseFloat(prodPrice),
-        stock_quantity: parseInt(prodStock),
-        max_limit_per_order: parseInt(prodMaxLimit),
+        stock_quantity: stockVal,
+        max_limit_per_order: maxLimitVal,
         image_url: prodImg || 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=500&auto=format&fit=crop&q=60'
       };
 
@@ -345,16 +379,41 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
         setProdImg('');
         fetchProducts();
       } else {
-        alert('Erro ao cadastrar produto.');
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || 'Erro ao cadastrar produto.');
       }
     } catch (err) {
       alert('Erro na requisição de cadastro.');
     }
   }
 
+  function startEditingProduct(prod) {
+    setEditingProdId(prod.id);
+    setEditPrice(prod.base_price);
+    setEditStock(prod.stock_quantity || 0);
+    setEditMaxLimit(prod.max_limit_per_order || 100);
+  }
+
+  function cancelEditingProduct() {
+    setEditingProdId(null);
+  }
+
+  async function saveProductRow(prodId) {
+    const stockVal = parseInt(editStock) || 0;
+    const maxLimitVal = parseInt(editMaxLimit) || 0;
+
+    if (maxLimitVal > stockVal) {
+      alert(`Erro de Validação: O limite máximo por compra (${maxLimitVal}) não pode ser maior do que o estoque total disponível (${stockVal}).`);
+      return;
+    }
+
+    await handleUpdateProductPriceStock(prodId, editPrice, editStock, editMaxLimit);
+    setEditingProdId(null);
+  }
+
   async function handleUpdateProductPriceStock(id, newPrice, newStock, newMaxLimit) {
     try {
-      await fetch(`/api/admin/products/${id}`, {
+      const res = await fetch(`/api/admin/products/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -366,9 +425,33 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
           max_limit_per_order: parseInt(newMaxLimit)
         })
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || 'Erro ao atualizar produto.');
+      }
       fetchProducts();
     } catch (err) {
       console.log('Erro ao atualizar produto:', err.message);
+    }
+  }
+
+  // Excluir Produto do Catálogo
+  async function handleDeleteProduct(id, name) {
+    if (!window.confirm(`Tem certeza que deseja excluir o produto "${name}" do catálogo?`)) return;
+    try {
+      const res = await fetch(`/api/admin/products/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        alert('Produto removido do catálogo com sucesso!');
+        fetchProducts();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || 'Erro ao excluir produto.');
+      }
+    } catch (err) {
+      alert('Erro de conexão ao excluir produto.');
     }
   }
 
@@ -826,12 +909,12 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
                       <input type="text" value={prodName} onChange={e => setProdName(e.target.value)} placeholder="Ex: Botton EJC 38mm" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} required />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>Categoria</label>
-                      <select value={prodCategory} onChange={e => setProdCategory(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}>
-                        <option value="Geral">Geral</option>
-                        <option value="Religiosos">Religiosos</option>
-                        <option value="Eventos">Eventos</option>
-                        <option value="Personalizados">Personalizados</option>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>Categoria no E-Commerce *</label>
+                      <select value={prodCategoryId} onChange={e => setProdCategoryId(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} required>
+                        <option value="">Selecione uma categoria...</option>
+                        {categoriesList.map(cat => (
+                          <option key={cat.id} value={cat.id}>{cat.name}</option>
+                        ))}
                       </select>
                     </div>
                     <div>
@@ -892,7 +975,7 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
                   </div>
                 </form>
 
-                {/* Tabela de Produtos Responsiva com Limite por Compra */}
+                 {/* Tabela de Produtos Responsiva com Edição por Lápis e Avisos de Estoque */}
                 <div className="card table-responsive" style={{ padding: 0, overflow: 'hidden' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', textAlign: 'left' }}>
                     <thead style={{ background: 'var(--primary-light)', color: 'var(--primary)', textTransform: 'uppercase', fontSize: '0.78rem' }}>
@@ -900,59 +983,136 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
                         <th style={{ padding: '14px 20px' }}>Foto</th>
                         <th style={{ padding: '14px 20px' }}>Produto</th>
                         <th style={{ padding: '14px 20px' }}>Categoria</th>
-                        <th style={{ padding: '14px 20px' }}>Preço (R$)</th>
+                        <th style={{ padding: '14px 20px' }}>Preço Venda</th>
                         <th style={{ padding: '14px 20px' }}>Estoque Total</th>
                         <th style={{ padding: '14px 20px' }}>Máx / Compra</th>
-                        <th style={{ padding: '14px 20px', textAlign: 'right' }}>Status</th>
+                        <th style={{ padding: '14px 20px' }}>Status de Estoque</th>
+                        <th style={{ padding: '14px 20px', textAlign: 'center' }}>Ação</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {productsList.map(prod => (
-                        <tr key={prod.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                          <td style={{ padding: '10px 20px' }}>
-                            <img
-                              src={prod.image_url}
-                              alt={prod.name}
-                              style={{ width: '40px', height: '40px', borderRadius: '6px', objectFit: 'cover' }}
-                              onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=500&auto=format&fit=crop&q=60'; }}
-                            />
-                          </td>
-                          <td style={{ padding: '14px 20px', fontWeight: '700', color: '#0f172a' }}>{prod.name}</td>
-                          <td style={{ padding: '14px 20px', color: '#64748b' }}>{prod.category || 'Geral'}</td>
-                          <td style={{ padding: '14px 20px' }}>
-                            <input
-                              type="number"
-                              step="0.50"
-                              defaultValue={prod.base_price}
-                              onBlur={e => handleUpdateProductPriceStock(prod.id, e.target.value, prod.stock_quantity, prod.max_limit_per_order)}
-                              style={{ width: '85px', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 'bold', color: 'var(--primary)' }}
-                            />
-                          </td>
-                          <td style={{ padding: '14px 20px' }}>
-                            <input
-                              type="number"
-                              defaultValue={prod.stock_quantity || 0}
-                              onBlur={e => handleUpdateProductPriceStock(prod.id, prod.base_price, e.target.value, prod.max_limit_per_order)}
-                              style={{ width: '75px', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 'bold' }}
-                            />
-                          </td>
-                          <td style={{ padding: '14px 20px' }}>
-                            <input
-                              type="number"
-                              defaultValue={prod.max_limit_per_order || 100}
-                              onBlur={e => handleUpdateProductPriceStock(prod.id, prod.base_price, prod.stock_quantity, e.target.value)}
-                              style={{ width: '75px', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 'bold' }}
-                            />
-                          </td>
-                          <td style={{ padding: '14px 20px', textAlign: 'right' }}>
-                            {prod.stock_quantity > 0 ? (
-                              <span className="badge badge-green">Disponível</span>
-                            ) : (
-                              <span className="badge" style={{ background: '#fee2e2', color: '#991b1b' }}>Esgotado</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                      {productsList.map(prod => {
+                        const isEditing = editingProdId === prod.id;
+                        const stockNum = parseInt(prod.stock_quantity || 0);
+                        const limitNum = parseInt(prod.max_limit_per_order || 1);
+                        const renewalThreshold = Math.ceil(limitNum * 1.2);
+
+                        return (
+                          <tr key={prod.id} style={{ borderBottom: '1px solid #e2e8f0', background: isEditing ? '#f8fafc' : 'transparent' }}>
+                            <td style={{ padding: '10px 20px' }}>
+                              <img
+                                src={prod.image_url}
+                                alt={prod.name}
+                                style={{ width: '40px', height: '40px', borderRadius: '6px', objectFit: 'cover' }}
+                                onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=500&auto=format&fit=crop&q=60'; }}
+                              />
+                            </td>
+                            <td style={{ padding: '14px 20px', fontWeight: '700', color: '#0f172a' }}>{prod.name}</td>
+                            <td style={{ padding: '14px 20px', color: '#64748b', fontWeight: '600' }}>{prod.category_name || prod.category || 'Geral'}</td>
+                            
+                            {/* Preço (Bloqueado por Padrão / Editável via Lápis) */}
+                            <td style={{ padding: '14px 20px', fontWeight: '700', color: 'var(--primary)' }}>
+                              {isEditing ? (
+                                <input
+                                  type="number"
+                                  step="0.50"
+                                  value={editPrice}
+                                  onChange={e => setEditPrice(e.target.value)}
+                                  style={{ width: '85px', padding: '6px 8px', borderRadius: '6px', border: '2px solid var(--secondary)', fontWeight: 'bold' }}
+                                />
+                              ) : (
+                                `R$ ${parseFloat(prod.base_price).toFixed(2)}`
+                              )}
+                            </td>
+
+                            {/* Estoque Total (Bloqueado por Padrão / Editável via Lápis) */}
+                            <td style={{ padding: '14px 20px', fontWeight: '700' }}>
+                              {isEditing ? (
+                                <input
+                                  type="number"
+                                  value={editStock}
+                                  onChange={e => setEditStock(e.target.value)}
+                                  style={{ width: '75px', padding: '6px 8px', borderRadius: '6px', border: '2px solid var(--secondary)', fontWeight: 'bold' }}
+                                />
+                              ) : (
+                                `${stockNum} un.`
+                              )}
+                            </td>
+
+                            {/* Limite Máx por Compra (Bloqueado por Padrão / Editável via Lápis) */}
+                            <td style={{ padding: '14px 20px', fontWeight: '700' }}>
+                              {isEditing ? (
+                                <input
+                                  type="number"
+                                  value={editMaxLimit}
+                                  onChange={e => setEditMaxLimit(e.target.value)}
+                                  style={{ width: '75px', padding: '6px 8px', borderRadius: '6px', border: '2px solid var(--secondary)', fontWeight: 'bold' }}
+                                />
+                              ) : (
+                                `${limitNum} un.`
+                              )}
+                            </td>
+
+                            {/* Status de Estoque com Badges de Alerta */}
+                            <td style={{ padding: '14px 20px' }}>
+                              {stockNum <= 0 || stockNum <= limitNum ? (
+                                <span className="badge" style={{ background: '#fee2e2', color: '#991b1b', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                  <AlertTriangle size={13} /> 🚫 Indisponível (Estoque Crítico)
+                                </span>
+                              ) : stockNum <= renewalThreshold ? (
+                                <span className="badge" style={{ background: '#fef3c7', color: '#92400e', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                  <AlertTriangle size={13} /> ⚠️ Renovar Estoque
+                                </span>
+                              ) : (
+                                <span className="badge badge-green">Disponível</span>
+                              )}
+                            </td>
+
+                            {/* Botão de Ação: Lápis para Editar / Confirmar */}
+                            <td style={{ padding: '14px 20px', textAlign: 'center' }}>
+                              {isEditing ? (
+                                <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                                  <button
+                                    className="btn btn-primary"
+                                    onClick={() => saveProductRow(prod.id)}
+                                    style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                                    title="Salvar Alterações"
+                                  >
+                                    <Save size={14} /> Salvar
+                                  </button>
+                                  <button
+                                    className="btn btn-outline"
+                                    onClick={cancelEditingProduct}
+                                    style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                                    title="Cancelar"
+                                  >
+                                    <XCircle size={14} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                                  <button
+                                    className="btn btn-outline"
+                                    onClick={() => startEditingProduct(prod)}
+                                    style={{ padding: '6px 10px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                    title="Editar Produto"
+                                  >
+                                    <Edit2 size={14} /> Editar
+                                  </button>
+                                  <button
+                                    className="btn btn-outline"
+                                    onClick={() => handleDeleteProduct(prod.id, prod.name)}
+                                    style={{ padding: '6px 10px', fontSize: '0.8rem', color: '#ef4444', borderColor: '#fca5a5', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                    title="Excluir Produto"
+                                  >
+                                    <Trash2 size={14} /> Excluir
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

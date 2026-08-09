@@ -146,6 +146,7 @@ async function runMigrations() {
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_deadline VARCHAR(50) DEFAULT '5 dias úteis';
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id VARCHAR(36) REFERENCES customers(id) ON DELETE SET NULL;
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS pdf_url TEXT;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS stock_deducted BOOLEAN DEFAULT FALSE;
     `);
 
     console.log('✅ Migrations executadas com sucesso no PostgreSQL!');

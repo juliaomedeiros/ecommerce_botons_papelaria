@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, ShoppingCart, Sparkles, Check, Info } from 'lucide-react';
+import BottonMockupDisplay from './BottonMockupDisplay';
 
 export default function ProductDetailModal({ product, isOpen, onClose, onAddToCart, onCustomizeClick, isModo24h }) {
   if (!isOpen || !product) return null;
@@ -8,12 +9,19 @@ export default function ProductDetailModal({ product, isOpen, onClose, onAddToCa
   const [finishType, setFinishType] = useState('alfinete');
   const [quantity, setQuantity] = useState(1);
 
-  const unitPrice = parseFloat(product.base_price || 5.00);
+  // Localizar a variação exata correspondente (Diâmetro x Acabamento)
+  const matchedVar = Array.isArray(product.variations) ? product.variations.find(
+    v => v.diameter === diameter && v.finish_type === finishType
+  ) : null;
+
+  const unitPrice = matchedVar && matchedVar.price_override ? parseFloat(matchedVar.price_override) : parseFloat(product.base_price || 5.00);
   const totalPrice = unitPrice * quantity;
+  const currentStock = matchedVar !== null && matchedVar !== undefined ? parseInt(matchedVar.stock_quantity) : parseInt(product.stock_quantity || 0);
 
   function handleAdd() {
     onAddToCart({
       product_id: product.id,
+      variation_id: matchedVar ? matchedVar.id : null,
       name: product.name,
       quantity,
       unit_price: unitPrice,
@@ -24,6 +32,10 @@ export default function ProductDetailModal({ product, isOpen, onClose, onAddToCa
     });
     onClose();
   }
+
+  const isBottonCategory = product.category_id === 'cat-bottons-001' || 
+    (product.name && product.name.toLowerCase().includes('botton') && !product.is_customizable) || 
+    (product.category_name && product.category_name.toLowerCase().includes('botton') && !product.is_customizable);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -41,26 +53,38 @@ export default function ProductDetailModal({ product, isOpen, onClose, onAddToCa
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '24px' }}>
           
-          {/* Imagem Ampliada do Produto */}
+          {/* Imagem Ampliada / Mockup 3D do Produto */}
           <div>
-            <div style={{
-              height: '260px',
-              borderRadius: '16px',
-              overflow: 'hidden',
-              background: '#f1f5f9',
-              boxShadow: 'var(--shadow-sm)',
-              marginBottom: '12px'
-            }}>
-              <img
-                src={product.image_url}
-                alt={product.name}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=500&auto=format&fit=crop&q=60'; }}
-              />
-            </div>
+            {isBottonCategory ? (
+              <div style={{ marginBottom: '12px' }}>
+                <BottonMockupDisplay
+                  imageUrl={product.image_url}
+                  productName={product.name}
+                  finishType={finishType}
+                  size="modal"
+                  showToggle={true}
+                />
+              </div>
+            ) : (
+              <div style={{
+                height: '260px',
+                borderRadius: '16px',
+                overflow: 'hidden',
+                background: '#f1f5f9',
+                boxShadow: 'var(--shadow-sm)',
+                marginBottom: '12px'
+              }}>
+                <img
+                  src={product.image_url}
+                  alt={product.name}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=500&auto=format&fit=crop&q=60'; }}
+                />
+              </div>
+            )}
             <p style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center' }}>
               <Info size={14} style={{ display: 'inline', marginRight: '4px' }} />
-              Impressão HD com película protetora metálica de alta durabilidade.
+              Prensa de metal com película protetora de acetato brilhante de alta durabilidade.
             </p>
           </div>
 
@@ -172,6 +196,10 @@ export default function ProductDetailModal({ product, isOpen, onClose, onAddToCa
                 {product.is_customizable && !isModo24h ? (
                   <button className="btn btn-primary" onClick={onCustomizeClick} style={{ width: '100%' }}>
                     <Sparkles size={16} /> Personalize com uma imagem
+                  </button>
+                ) : (currentStock <= 0 || currentStock <= parseInt(product.max_limit_per_order || 0)) ? (
+                  <button className="btn btn-outline" disabled style={{ width: '100%', opacity: 0.6, cursor: 'not-allowed', background: '#fee2e2', color: '#991b1b', fontWeight: 'bold' }}>
+                    🚫 Combinação Esgotada no Momento
                   </button>
                 ) : (
                   <button className="btn btn-primary" onClick={handleAdd} style={{ width: '100%' }}>

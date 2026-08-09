@@ -1,17 +1,16 @@
 {
   "schema-version": 1,
-  "feature-dir": "_reversa_forward/002-admin-estoque-seguranca",
-  "feature-id": "002",
-  "short-name": "admin-estoque-seguranca",
-  "started-at": "2026-07-30T16:53:00-03:00",
-  "current-stage": "done",
+  "feature-dir": "_reversa_forward/005-matriz-variacoes-bottons",
+  "feature-id": "005",
+  "short-name": "matriz-variacoes-bottons",
+  "started-at": "2026-08-09T18:30:00-03:00",
+  "current-stage": "coding",
   "stages-completed": [
     "requirements",
     "clarify",
     "plan",
     "to-do",
-    "coding",
-    "sync"
+    "coding"
   ],
   "paused-features": []
 }

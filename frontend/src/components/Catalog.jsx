@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingCart, Tag, Filter, Sparkles, AlertCircle, Eye } from 'lucide-react';
+import BottonMockupDisplay from './BottonMockupDisplay';
 
 export default function Catalog({ isEventoMode, isModo24h, onAddToCart, onCustomizeClick, onSelectProduct }) {
   const [categories, setCategories] = useState([]);
@@ -81,27 +82,37 @@ export default function Catalog({ isEventoMode, isModo24h, onAddToCart, onCustom
         {visibleProducts.map(prod => (
           <div key={prod.id} className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div>
+              {/* Renderização de Imagem ou Mockup de Botton (Frente/Verso) */}
               <div 
                 onClick={() => onSelectProduct && onSelectProduct(prod)}
-                style={{
-                  height: '200px',
-                  borderRadius: '12px',
-                  overflow: 'hidden',
-                  marginBottom: '16px',
-                  background: '#f1f5f9',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer'
-                }}
+                style={{ cursor: 'pointer', marginBottom: '16px' }}
                 title="Clique para ver detalhes do produto"
               >
-                <img
-                  src={prod.image_url}
-                  alt={prod.name}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=500&auto=format&fit=crop&q=60'; }}
-                />
+                {(prod.category_id === 'cat-bottons-001' || (prod.name && prod.name.toLowerCase().includes('botton')) || (prod.category_name && prod.category_name.toLowerCase().includes('botton'))) ? (
+                  <BottonMockupDisplay 
+                    imageUrl={prod.image_url} 
+                    productName={prod.name} 
+                    size="card" 
+                    showToggle={true} 
+                  />
+                ) : (
+                  <div style={{
+                    height: '200px',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                    background: '#f1f5f9',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <img
+                      src={prod.image_url}
+                      alt={prod.name}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=500&auto=format&fit=crop&q=60'; }}
+                    />
+                  </div>
+                )}
               </div>
 
               <span className="badge badge-primary" style={{ marginBottom: '8px' }}>
@@ -129,6 +140,14 @@ export default function Catalog({ isEventoMode, isModo24h, onAddToCart, onCustom
                 {prod.is_customizable && !isModo24h ? (
                   <button className="btn btn-primary" onClick={onCustomizeClick} style={{ width: '100%' }}>
                     <Sparkles size={16} /> Personalize com uma imagem
+                  </button>
+                ) : (prod.stock_quantity !== undefined && prod.stock_quantity !== null && (parseInt(prod.stock_quantity) <= 0 || parseInt(prod.stock_quantity) <= parseInt(prod.max_limit_per_order || 0))) ? (
+                  <button
+                    className="btn btn-outline"
+                    disabled
+                    style={{ width: '100%', opacity: 0.6, cursor: 'not-allowed', background: '#f1f5f9', color: '#94a3b8' }}
+                  >
+                    Indisponível no momento
                   </button>
                 ) : (
                   <button

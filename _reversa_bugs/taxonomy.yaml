@@ -1,0 +1,15 @@
+# Taxonomy do projeto sistema_tutaspaper
+areas:
+  - catalogo
+  - admin
+  - checkout
+  - whatsapp
+modules:
+  - produtos
+  - categorias
+  - estoque
+  - autenticacao
+features:
+  - filtro-categorias
+  - cadastro-produto
+  - dropdown-categorias

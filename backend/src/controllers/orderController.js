@@ -75,14 +75,8 @@ async function createOrder(req, res) {
         }
       }
 
-      // Baixa no estoque da variação se informada
-      if (variation_id) {
-        await db.query(`
-          UPDATE product_variations
-          SET stock_quantity = GREATEST(0, stock_quantity - $1)
-          WHERE id = $2
-        `, [itemQty, variation_id]);
-      }
+      // NOTA: O estoque NÃO é abatido aqui na criação do pedido pendente.
+      // O abatimento só ocorre quando o pagamento é confirmado ('approved') via Webhook Mercado Pago ou Fila Noturna.
 
       processedItems.push({
         id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
@@ -265,9 +259,48 @@ async function getDashboardStats(req, res) {
   }
 }
 
+// Função Auxiliar: Abater estoque do pedido APENAS quando o pagamento é confirmado ('approved')
+async function deductStockForOrder(orderId) {
+  try {
+    const checkRes = await db.query('SELECT stock_deducted, payment_status FROM orders WHERE id = $1', [orderId]);
+    if (checkRes.rows.length === 0 || checkRes.rows[0].stock_deducted === true) {
+      return false; // Já abatido ou pedido inexistente
+    }
+
+    const itemsRes = await db.query('SELECT * FROM order_items WHERE order_id = $1', [orderId]);
+    for (const item of itemsRes.rows) {
+      const itemQty = parseInt(item.quantity) || 1;
+
+      if (item.variation_id) {
+        await db.query(`
+          UPDATE product_variations
+          SET stock_quantity = GREATEST(0, stock_quantity - $1)
+          WHERE id = $2
+        `, [itemQty, item.variation_id]);
+      }
+
+      if (item.product_id) {
+        await db.query(`
+          UPDATE products
+          SET stock_quantity = GREATEST(0, stock_quantity - $1)
+          WHERE id = $2
+        `, [itemQty, item.product_id]);
+      }
+    }
+
+    await db.query('UPDATE orders SET stock_deducted = TRUE WHERE id = $1', [orderId]);
+    console.log(`✅ Estoque abatido no PostgreSQL para o pedido confirmado ${orderId}`);
+    return true;
+  } catch (error) {
+    console.error(`Erro ao abater estoque do pedido ${orderId}:`, error);
+    return false;
+  }
+}
+
 module.exports = {
   createOrder,
   getProductionQueue,
   updateProductionStatus,
-  getDashboardStats
+  getDashboardStats,
+  deductStockForOrder
 };

@@ -18,30 +18,15 @@ async function runSeed() {
     }
 
     // 2. Categorias Iniciais
-    const catBotton = await db.query('SELECT id FROM categories WHERE slug = $1', ['bottons-personalizados']);
-    let bottonCatId = 'cat-bottons-001';
-    if (catBotton.rows.length === 0) {
-      await db.query(`
-        INSERT INTO categories (id, name, slug, description, display_order)
-        VALUES ('cat-bottons-001', 'Bottons Personalizados', 'bottons-personalizados', 'Bottons, Chaveiros e Ímãs com arte própria ou galeria em 24h', 1)
-      `);
-    }
-
-    const catReligiosos = await db.query('SELECT id FROM categories WHERE slug = $1', ['artigos-religiosos']);
-    if (catReligiosos.rows.length === 0) {
-      await db.query(`
-        INSERT INTO categories (id, name, slug, description, display_order)
-        VALUES ('cat-religiosos-002', 'Artigos Religiosos', 'artigos-religiosos', 'Terços, imagens, medalhas e artigos de fé', 2)
-      `);
-    }
-
-    const catPapelaria = await db.query('SELECT id FROM categories WHERE slug = $1', ['materiais-papelaria']);
-    if (catPapelaria.rows.length === 0) {
-      await db.query(`
-        INSERT INTO categories (id, name, slug, description, display_order)
-        VALUES ('cat-papelaria-003', 'Materiais de Papelaria', 'materiais-papelaria', 'Cadernos, agendas, canetas e artigos de papelaria', 3)
-      `);
-    }
+    await db.query(`
+      INSERT INTO categories (id, name, slug, description, display_order)
+      VALUES 
+        ('cat-bottons-001', 'Bottons', 'bottons', 'Bottons, Chaveiros e Ímãs de catálogo com estampas exclusivas', 1),
+        ('cat-custom-002', 'Bottons Personalizados', 'bottons-personalizados', 'Crie o seu botton personalizado com sua própria foto ou logo', 2),
+        ('cat-religiosos-003', 'Artigos Religiosos', 'artigos-religiosos', 'Terços, imagens, medalhas e artigos de fé', 3),
+        ('cat-papelaria-004', 'Materiais de Papelaria', 'materiais-papelaria', 'Cadernos, agendas, canetas e artigos de papelaria', 4)
+      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, slug = EXCLUDED.slug, description = EXCLUDED.description;
+    `);
 
     // 3. Produto Botton Fast-Food com Variações
     const prodBotton = await db.query('SELECT id FROM products WHERE slug = $1', ['botton-personalizado-fastfood']);

@@ -1,5 +1,6 @@
 const db = require('../database/db');
 const whatsappService = require('../services/whatsappService');
+const { deductStockForOrder } = require('./orderController');
 
 async function handleMercadoPagoWebhook(req, res) {
   try {
@@ -19,6 +20,9 @@ async function handleMercadoPagoWebhook(req, res) {
       if (orderResult.rows.length > 0) {
         const order = orderResult.rows[0];
         console.log(`✅ Pedido ${order.id} aprovado via Webhook Mercado Pago!`);
+
+        // Abater estoque com confirmação garantida de pagamento no dinheiro em conta
+        await deductStockForOrder(order.id);
         
         // Enviar WhatsApp de confirmação
         await whatsappService.sendTextMessage(

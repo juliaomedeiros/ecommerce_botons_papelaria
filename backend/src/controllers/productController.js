@@ -74,9 +74,18 @@ async function getProducts(req, res) {
 // Criar produto (Admin e Funcionário)
 async function createProduct(req, res) {
   try {
-    const { category_id, name, description, base_price, custom_upload_fee, is_customizable, stock_quantity, max_limit_per_order, image_url } = req.body;
-    if (!name || base_price === undefined) {
-      return res.status(400).json({ error: 'Nome e preço base são obrigatórios.' });
+    const { category_id, name, description, base_price, custom_upload_fee, is_customizable, stock_quantity, max_limit_per_order, image_url, variations } = req.body;
+    
+    let totalStockFromVars = 0;
+    if (Array.isArray(variations) && variations.length > 0) {
+      totalStockFromVars = variations.reduce((acc, v) => acc + (parseInt(v.stock_quantity) || 0), 0);
+    }
+
+    const finalStock = (Array.isArray(variations) && variations.length > 0) ? totalStockFromVars : (stock_quantity !== undefined ? parseInt(stock_quantity) : 10);
+    const finalMaxLimit = max_limit_per_order !== undefined ? parseInt(max_limit_per_order) : 100;
+
+    if (finalMaxLimit > finalStock && finalStock > 0) {
+      return res.status(400).json({ error: 'O limite máximo por compra não pode ser maior do que o estoque total disponível.' });
     }
 
     const slug = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "-") + '-' + Date.now();
@@ -91,15 +100,38 @@ async function createProduct(req, res) {
       name,
       slug,
       description || '',
-      base_price,
+      base_price || 0,
       custom_upload_fee || 0,
       is_customizable || false,
-      stock_quantity !== undefined ? stock_quantity : 10,
-      max_limit_per_order !== undefined ? max_limit_per_order : 100,
+      finalStock,
+      finalMaxLimit,
       image_url || null
     ]);
 
-    return res.status(201).json(result.rows[0]);
+    // Inserir variações se enviadas
+    if (Array.isArray(variations) && variations.length > 0) {
+      for (const v of variations) {
+        const varId = `var-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+        await db.query(`
+          INSERT INTO product_variations (id, product_id, diameter, finish_type, price_override, stock_quantity, sku)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `, [
+          varId,
+          id,
+          v.diameter || '38mm',
+          v.finish_type || 'alfinete',
+          parseFloat(v.price_override || base_price || 0),
+          parseInt(v.stock_quantity || 0),
+          `BOT-${id.slice(-6)}-${v.diameter}-${v.finish_type}`
+        ]);
+      }
+    }
+
+    const createdProd = result.rows[0];
+    const varsRes = await db.query('SELECT * FROM product_variations WHERE product_id = $1', [id]);
+    createdProd.variations = varsRes.rows;
+
+    return res.status(201).json(createdProd);
   } catch (error) {
     console.error('Erro ao criar produto:', error);
     return res.status(500).json({ error: 'Erro ao criar produto.' });
@@ -110,7 +142,7 @@ async function createProduct(req, res) {
 async function updateProduct(req, res) {
   try {
     const { id } = req.params;
-    const { name, description, base_price, custom_upload_fee, is_customizable, stock_quantity, max_limit_per_order, image_url, is_active, category_id } = req.body;
+    const { name, description, base_price, custom_upload_fee, is_customizable, stock_quantity, max_limit_per_order, image_url, is_active, category_id, variations } = req.body;
 
     const currentRes = await db.query('SELECT * FROM products WHERE id = $1', [id]);
     if (currentRes.rows.length === 0) {
@@ -119,13 +151,41 @@ async function updateProduct(req, res) {
 
     const current = currentRes.rows[0];
 
+    // Se variações foram enviadas, atualizar a tabela de variações
+    if (Array.isArray(variations) && variations.length > 0) {
+      await db.query('DELETE FROM product_variations WHERE product_id = $1', [id]);
+      let totalStockFromVars = 0;
+      for (const v of variations) {
+        const varStock = parseInt(v.stock_quantity) || 0;
+        totalStockFromVars += varStock;
+        const varId = `var-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+        await db.query(`
+          INSERT INTO product_variations (id, product_id, diameter, finish_type, price_override, stock_quantity, sku)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `, [
+          varId,
+          id,
+          v.diameter || '38mm',
+          v.finish_type || 'alfinete',
+          parseFloat(v.price_override || base_price || current.base_price || 0),
+          varStock,
+          `BOT-${id.slice(-6)}-${v.diameter}-${v.finish_type}`
+        ]);
+      }
+      req.body.stock_quantity = totalStockFromVars;
+    }
+
     const updatedName = name !== undefined ? name : current.name;
     const updatedDesc = description !== undefined ? description : current.description;
     const updatedPrice = base_price !== undefined ? base_price : current.base_price;
     const updatedFee = custom_upload_fee !== undefined ? custom_upload_fee : current.custom_upload_fee;
     const updatedCustom = is_customizable !== undefined ? is_customizable : current.is_customizable;
-    const updatedStock = stock_quantity !== undefined ? stock_quantity : current.stock_quantity;
-    const updatedMaxLimit = max_limit_per_order !== undefined ? max_limit_per_order : current.max_limit_per_order;
+    const updatedStock = req.body.stock_quantity !== undefined ? parseInt(req.body.stock_quantity) : (stock_quantity !== undefined ? parseInt(stock_quantity) : parseInt(current.stock_quantity));
+    const updatedMaxLimit = max_limit_per_order !== undefined ? parseInt(max_limit_per_order) : parseInt(current.max_limit_per_order);
+
+    if (updatedMaxLimit > updatedStock && updatedStock > 0) {
+      return res.status(400).json({ error: 'O limite máximo por compra não pode ser maior do que o estoque total disponível.' });
+    }
     const updatedImage = image_url !== undefined ? image_url : current.image_url;
     const updatedActive = is_active !== undefined ? is_active : current.is_active;
     const updatedCat = category_id !== undefined ? category_id : current.category_id;
@@ -137,7 +197,11 @@ async function updateProduct(req, res) {
       WHERE id = $11 RETURNING *
     `, [updatedName, updatedDesc, updatedPrice, updatedFee, updatedCustom, updatedStock, updatedMaxLimit, updatedImage, updatedActive, updatedCat, id]);
 
-    return res.json(result.rows[0]);
+    const updatedProd = result.rows[0];
+    const varsRes = await db.query('SELECT * FROM product_variations WHERE product_id = $1', [id]);
+    updatedProd.variations = varsRes.rows;
+
+    return res.json(updatedProd);
   } catch (error) {
     console.error('Erro ao atualizar produto:', error);
     return res.status(500).json({ error: 'Erro ao atualizar produto.' });
