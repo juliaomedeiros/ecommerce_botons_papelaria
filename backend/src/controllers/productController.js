@@ -113,8 +113,8 @@ async function createProduct(req, res) {
       for (const v of variations) {
         const varId = `var-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
         await db.query(`
-          INSERT INTO product_variations (id, product_id, diameter, finish_type, price_override, stock_quantity, sku)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          INSERT INTO product_variations (id, product_id, diameter, finish_type, price_override, stock_quantity, max_limit_per_order, sku)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         `, [
           varId,
           id,
@@ -122,6 +122,7 @@ async function createProduct(req, res) {
           v.finish_type || 'alfinete',
           parseFloat(v.price_override || base_price || 0),
           parseInt(v.stock_quantity || 0),
+          parseInt(v.max_limit_per_order || 100),
           `BOT-${id.slice(-6)}-${v.diameter}-${v.finish_type}`
         ]);
       }
@@ -160,8 +161,8 @@ async function updateProduct(req, res) {
         totalStockFromVars += varStock;
         const varId = `var-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
         await db.query(`
-          INSERT INTO product_variations (id, product_id, diameter, finish_type, price_override, stock_quantity, sku)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          INSERT INTO product_variations (id, product_id, diameter, finish_type, price_override, stock_quantity, max_limit_per_order, sku)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         `, [
           varId,
           id,
@@ -169,6 +170,7 @@ async function updateProduct(req, res) {
           v.finish_type || 'alfinete',
           parseFloat(v.price_override || base_price || current.base_price || 0),
           varStock,
+          parseInt(v.max_limit_per_order || 100),
           `BOT-${id.slice(-6)}-${v.diameter}-${v.finish_type}`
         ]);
       }

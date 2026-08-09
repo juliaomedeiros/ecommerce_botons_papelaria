@@ -54,6 +54,16 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
   const [editStock, setEditStock] = useState('');
   const [editMaxLimit, setEditMaxLimit] = useState('');
 
+  // Matriz de Variações (25mm e 38mm x Alfinete, Chaveiro, Ímã)
+  const [varMatrix, setVarMatrix] = useState({
+    '25mm_alfinete': { price: '5.00', stock: '500', maxLimit: '50' },
+    '25mm_chaveiro': { price: '7.00', stock: '300', maxLimit: '30' },
+    '25mm_ima': { price: '6.50', stock: '250', maxLimit: '25' },
+    '38mm_alfinete': { price: '6.00', stock: '600', maxLimit: '100' },
+    '38mm_chaveiro': { price: '8.50', stock: '400', maxLimit: '50' },
+    '38mm_ima': { price: '8.00', stock: '350', maxLimit: '35' }
+  });
+
   // Form de Cliente
   const [custName, setCustName] = useState('');
   const [custPhone, setCustPhone] = useState('');
@@ -346,22 +356,49 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
   // Cadastrar Produto com Imagem e Limite Máximo por Compra
   async function handleAddProduct(e) {
     e.preventDefault();
-    const stockVal = parseInt(prodStock) || 0;
-    const maxLimitVal = parseInt(prodMaxLimit) || 0;
 
-    if (maxLimitVal > stockVal) {
-      alert(`Erro de Validação: O limite máximo por compra (${maxLimitVal}) não pode ser maior do que o estoque total disponível (${stockVal}).`);
-      return;
+    const selectedCategoryObj = categoriesList.find(c => c.id === prodCategoryId);
+    const isBottonCat = prodCategoryId === 'cat-bottons-001' || (selectedCategoryObj && selectedCategoryObj.slug === 'bottons');
+
+    let finalStockVal = parseInt(prodStock) || 0;
+    let finalMaxLimitVal = parseInt(prodMaxLimit) || 0;
+    let variationsArray = [];
+
+    if (isBottonCat) {
+      variationsArray = [
+        { diameter: '25mm', finish_type: 'alfinete', price_override: parseFloat(varMatrix['25mm_alfinete'].price), stock_quantity: parseInt(varMatrix['25mm_alfinete'].stock) || 0, max_limit_per_order: parseInt(varMatrix['25mm_alfinete'].maxLimit) || 50 },
+        { diameter: '25mm', finish_type: 'chaveiro', price_override: parseFloat(varMatrix['25mm_chaveiro'].price), stock_quantity: parseInt(varMatrix['25mm_chaveiro'].stock) || 0, max_limit_per_order: parseInt(varMatrix['25mm_chaveiro'].maxLimit) || 30 },
+        { diameter: '25mm', finish_type: 'ima', price_override: parseFloat(varMatrix['25mm_ima'].price), stock_quantity: parseInt(varMatrix['25mm_ima'].stock) || 0, max_limit_per_order: parseInt(varMatrix['25mm_ima'].maxLimit) || 25 },
+        { diameter: '38mm', finish_type: 'alfinete', price_override: parseFloat(varMatrix['38mm_alfinete'].price), stock_quantity: parseInt(varMatrix['38mm_alfinete'].stock) || 0, max_limit_per_order: parseInt(varMatrix['38mm_alfinete'].maxLimit) || 100 },
+        { diameter: '38mm', finish_type: 'chaveiro', price_override: parseFloat(varMatrix['38mm_chaveiro'].price), stock_quantity: parseInt(varMatrix['38mm_chaveiro'].stock) || 0, max_limit_per_order: parseInt(varMatrix['38mm_chaveiro'].maxLimit) || 50 },
+        { diameter: '38mm', finish_type: 'ima', price_override: parseFloat(varMatrix['38mm_ima'].price), stock_quantity: parseInt(varMatrix['38mm_ima'].stock) || 0, max_limit_per_order: parseInt(varMatrix['38mm_ima'].maxLimit) || 35 }
+      ];
+
+      // Validar cada variação
+      for (const v of variationsArray) {
+        if (v.max_limit_per_order > v.stock_quantity && v.stock_quantity > 0) {
+          alert(`Erro de Validação na Variação (${v.diameter} - ${v.finish_type}): O limite por compra (${v.max_limit_per_order}) não pode ser maior que o estoque (${v.stock_quantity}).`);
+          return;
+        }
+      }
+
+      finalStockVal = variationsArray.reduce((acc, v) => acc + v.stock_quantity, 0);
+    } else {
+      if (finalMaxLimitVal > finalStockVal && finalStockVal > 0) {
+        alert(`Erro de Validação: O limite máximo por compra (${finalMaxLimitVal}) não pode ser maior do que o estoque total disponível (${finalStockVal}).`);
+        return;
+      }
     }
 
     try {
       const payload = {
         name: prodName,
         category_id: prodCategoryId || null,
-        base_price: parseFloat(prodPrice),
-        stock_quantity: stockVal,
-        max_limit_per_order: maxLimitVal,
-        image_url: prodImg || 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=500&auto=format&fit=crop&q=60'
+        base_price: parseFloat(prodPrice || 5.00),
+        stock_quantity: finalStockVal,
+        max_limit_per_order: finalMaxLimitVal || 100,
+        image_url: prodImg || 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=500&auto=format&fit=crop&q=60',
+        variations: isBottonCat ? variationsArray : []
       };
 
       const res = await fetch('/api/admin/products', {
@@ -374,7 +411,7 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
       });
 
       if (res.ok) {
-        alert('Produto cadastrado com sucesso!');
+        alert('Produto cadastrado com matriz de variações com sucesso!');
         setProdName('');
         setProdImg('');
         fetchProducts();
@@ -903,7 +940,7 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
                 <form onSubmit={handleAddProduct} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: '#ffffff' }}>
                   <h3 style={{ fontSize: '1.1rem', color: 'var(--primary)', fontWeight: '800' }}>Cadastrar Novo Produto</h3>
                   
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>Nome do Produto *</label>
                       <input type="text" value={prodName} onChange={e => setProdName(e.target.value)} placeholder="Ex: Botton EJC 38mm" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} required />
@@ -917,19 +954,95 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
                         ))}
                       </select>
                     </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>Preço Venda (R$)</label>
-                      <input type="number" step="0.50" value={prodPrice} onChange={e => setProdPrice(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} required />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>Estoque Total</label>
-                      <input type="number" value={prodStock} onChange={e => setProdStock(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} required />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>Limite Máx. por Compra</label>
-                      <input type="number" value={prodMaxLimit} onChange={e => setProdMaxLimit(e.target.value)} placeholder="Ex: 50" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} required />
-                    </div>
                   </div>
+
+                  {/* Se a categoria selecionada for 'Bottons', exibir a matriz de 6 variações com preço, estoque e limite por compra */}
+                  {(prodCategoryId === 'cat-bottons-001' || categoriesList.find(c => c.id === prodCategoryId)?.slug === 'bottons') ? (
+                    <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h4 style={{ fontSize: '0.95rem', fontWeight: '800', color: 'var(--primary)', margin: 0, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          🎛️ Matriz de Variações (Tamanho x Acabamento Verso)
+                        </h4>
+                        <span style={{ fontSize: '0.75rem', background: '#e2e8f0', color: '#475569', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>
+                          Estoque Total Calculado: {
+                            Object.values(varMatrix).reduce((acc, curr) => acc + (parseInt(curr.stock) || 0), 0)
+                          } un.
+                        </span>
+                      </div>
+                      <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>
+                        Configure o preço, estoque total e limite por compra para cada combinação disponível:
+                      </p>
+
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', fontSize: '0.82rem', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ background: '#e2e8f0', color: 'var(--primary)', textAlign: 'left' }}>
+                              <th style={{ padding: '8px 10px', borderRadius: '6px 0 0 6px' }}>Tamanho</th>
+                              <th style={{ padding: '8px 10px' }}>Acabamento Verso</th>
+                              <th style={{ padding: '8px 10px' }}>Preço Venda (R$)</th>
+                              <th style={{ padding: '8px 10px' }}>Estoque Total (un.)</th>
+                              <th style={{ padding: '8px 10px', borderRadius: '0 6px 6px 0' }}>Limite Máx. por Compra</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[
+                              { key: '25mm_alfinete', size: '25mm (Pequeno)', finish: '🧷 Alfinete de Metal' },
+                              { key: '25mm_chaveiro', size: '25mm (Pequeno)', finish: '🔑 Chaveiro 2 Faces' },
+                              { key: '25mm_ima', size: '25mm (Pequeno)', finish: '🧲 Ímã de Geladeira' },
+                              { key: '38mm_alfinete', size: '38mm (Padrão)', finish: '🧷 Alfinete de Metal' },
+                              { key: '38mm_chaveiro', size: '38mm (Padrão)', finish: '🔑 Chaveiro 2 Faces' },
+                              { key: '38mm_ima', size: '38mm (Padrão)', finish: '🧲 Ímã de Geladeira' }
+                            ].map(row => (
+                              <tr key={row.key} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                                <td style={{ padding: '8px 10px', fontWeight: 'bold' }}>{row.size}</td>
+                                <td style={{ padding: '8px 10px' }}>{row.finish}</td>
+                                <td style={{ padding: '8px 10px' }}>
+                                  <input
+                                    type="number"
+                                    step="0.50"
+                                    value={varMatrix[row.key]?.price || ''}
+                                    onChange={e => setVarMatrix({ ...varMatrix, [row.key]: { ...varMatrix[row.key], price: e.target.value } })}
+                                    style={{ width: '85px', padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                                  />
+                                </td>
+                                <td style={{ padding: '8px 10px' }}>
+                                  <input
+                                    type="number"
+                                    value={varMatrix[row.key]?.stock || ''}
+                                    onChange={e => setVarMatrix({ ...varMatrix, [row.key]: { ...varMatrix[row.key], stock: e.target.value } })}
+                                    style={{ width: '85px', padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                                  />
+                                </td>
+                                <td style={{ padding: '8px 10px' }}>
+                                  <input
+                                    type="number"
+                                    value={varMatrix[row.key]?.maxLimit || ''}
+                                    onChange={e => setVarMatrix({ ...varMatrix, [row.key]: { ...varMatrix[row.key], maxLimit: e.target.value } })}
+                                    style={{ width: '85px', padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                                  />
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>Preço Venda (R$)</label>
+                        <input type="number" step="0.50" value={prodPrice} onChange={e => setProdPrice(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} required />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>Estoque Total</label>
+                        <input type="number" value={prodStock} onChange={e => setProdStock(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} required />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>Limite Máx. por Compra</label>
+                        <input type="number" value={prodMaxLimit} onChange={e => setProdMaxLimit(e.target.value)} placeholder="Ex: 50" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} required />
+                      </div>
+                    </div>
+                  )}
 
                   {/* Upload de Imagem Físico + URL */}
                   <div>

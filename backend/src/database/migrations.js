@@ -139,6 +139,7 @@ async function runMigrations() {
     await db.query(`
       ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_quantity INT DEFAULT 10;
       ALTER TABLE products ADD COLUMN IF NOT EXISTS max_limit_per_order INT DEFAULT 100;
+      ALTER TABLE product_variations ADD COLUMN IF NOT EXISTS max_limit_per_order INT DEFAULT 100;
     `);
 
     // Adicionar colunas adicionais na tabela orders se não existirem

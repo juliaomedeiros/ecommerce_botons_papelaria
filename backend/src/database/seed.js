@@ -19,14 +19,35 @@ async function runSeed() {
 
     // 2. Categorias Iniciais
     await db.query(`
-      INSERT INTO categories (id, name, slug, description, display_order)
-      VALUES 
-        ('cat-bottons-001', 'Bottons', 'bottons', 'Bottons, Chaveiros e Ímãs de catálogo com estampas exclusivas', 1),
-        ('cat-custom-002', 'Bottons Personalizados', 'bottons-personalizados', 'Crie o seu botton personalizado com sua própria foto ou logo', 2),
-        ('cat-religiosos-003', 'Artigos Religiosos', 'artigos-religiosos', 'Terços, imagens, medalhas e artigos de fé', 3),
-        ('cat-papelaria-004', 'Materiais de Papelaria', 'materiais-papelaria', 'Cadernos, agendas, canetas e artigos de papelaria', 4)
-      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, slug = EXCLUDED.slug, description = EXCLUDED.description;
+      UPDATE categories 
+      SET slug = 'bottons', name = 'Bottons', description = 'Bottons, Chaveiros e Ímãs de catálogo com estampas exclusivas'
+      WHERE id = 'cat-bottons-001';
     `);
+
+    const defaultCategories = [
+      { id: 'cat-bottons-001', name: 'Bottons', slug: 'bottons', description: 'Bottons, Chaveiros e Ímãs de catálogo com estampas exclusivas', display_order: 1 },
+      { id: 'cat-custom-002', name: 'Bottons Personalizados', slug: 'bottons-personalizados', description: 'Crie o seu botton personalizado com sua própria foto ou logo', display_order: 2 },
+      { id: 'cat-religiosos-003', name: 'Artigos Religiosos', slug: 'artigos-religiosos', description: 'Terços, imagens, medalhas e artigos de fé', display_order: 3 },
+      { id: 'cat-papelaria-004', name: 'Materiais de Papelaria', slug: 'materiais-papelaria', description: 'Cadernos, agendas, canetas e artigos de papelaria', display_order: 4 }
+    ];
+
+    for (const c of defaultCategories) {
+      const existsId = await db.query('SELECT id FROM categories WHERE id = $1', [c.id]);
+      const existsSlug = await db.query('SELECT id FROM categories WHERE slug = $1', [c.slug]);
+
+      if (existsId.rows.length === 0 && existsSlug.rows.length === 0) {
+        await db.query(`
+          INSERT INTO categories (id, name, slug, description, display_order)
+          VALUES ($1, $2, $3, $4, $5)
+        `, [c.id, c.name, c.slug, c.description, c.display_order]);
+      } else {
+        await db.query(`
+          UPDATE categories
+          SET name = $1, slug = $2, description = $3, display_order = $4
+          WHERE id = $5 OR slug = $2
+        `, [c.name, c.slug, c.description, c.display_order, c.id]);
+      }
+    }
 
     // 3. Produto Botton Fast-Food com Variações
     const prodBotton = await db.query('SELECT id FROM products WHERE slug = $1', ['botton-personalizado-fastfood']);
