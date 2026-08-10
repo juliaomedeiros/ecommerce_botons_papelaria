@@ -7,6 +7,7 @@ import SizeGuideModal from './components/SizeGuideModal';
 import Checkout from './components/Checkout';
 import AdminDashboard from './components/AdminDashboard';
 import ProductDetailModal from './components/ProductDetailModal';
+import AddToCartSuccessModal from './components/AddToCartSuccessModal';
 import { Sparkles, ShieldCheck, Clock, Award, Zap } from 'lucide-react';
 
 export default function App() {
@@ -23,6 +24,9 @@ export default function App() {
   const [isModo24h, setIsModo24h] = useState(false);
   const [heroPhrase, setHeroPhrase] = useState('Escolha seu botton no catálogo ou personalize um modelo exclusivo com a sua imagem.');
   const [guideProceedTarget, setGuideProceedTarget] = useState(null);
+
+  const [lastAddedItem, setLastAddedItem] = useState(null);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
 
   // Sincronizar estado de rotas (/admin, /carrinho, /home, /)
   const isAdminRoute = location.pathname.startsWith('/admin');
@@ -46,13 +50,14 @@ export default function App() {
 
   function handleAddToCart(item) {
     setCart(prev => [...prev, item]);
-    setIsCartOpen(true);
+    setLastAddedItem(item);
+    setIsSuccessModalOpen(true);
   }
 
   function handleAddToCartFromCatalog(item) {
     setCart(prev => [...prev, item]);
-    setGuideProceedTarget('cart');
-    setIsSizeGuideOpen(true);
+    setLastAddedItem(item);
+    setIsSuccessModalOpen(true);
   }
 
   function handleOpenCustomizerFlow() {
@@ -293,6 +298,18 @@ export default function App() {
         isOpen={isCartOpen}
         onClose={handleCloseCart}
         onClearCart={handleClearCart}
+      />
+
+      <AddToCartSuccessModal
+        isOpen={isSuccessModalOpen}
+        item={lastAddedItem}
+        onClose={() => setIsSuccessModalOpen(false)}
+        onGoToCheckout={() => {
+          setIsSuccessModalOpen(false);
+          setIsCartOpen(true);
+          navigate('/carrinho');
+        }}
+        onContinueShopping={() => setIsSuccessModalOpen(false)}
       />
 
     </div>

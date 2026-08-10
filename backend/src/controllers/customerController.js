@@ -3,7 +3,16 @@ const db = require('../database/db');
 // Listar todos os clientes compradores
 async function getCustomers(req, res) {
   try {
-    const result = await db.query('SELECT * FROM customers ORDER BY created_at DESC');
+    const result = await db.query(`
+      SELECT 
+        c.*,
+        COALESCE(COUNT(o.id), 0) AS total_orders,
+        MAX(o.created_at) AS last_order_at
+      FROM customers c
+      LEFT JOIN orders o ON (c.phone = o.customer_phone OR (c.cpf IS NOT NULL AND c.cpf = o.customer_cpf))
+      GROUP BY c.id
+      ORDER BY c.created_at DESC
+    `);
     return res.json(result.rows);
   } catch (error) {
     console.error('Erro ao listar clientes:', error);
@@ -47,6 +56,32 @@ async function upsertCustomer(req, res) {
   }
 }
 
+// Buscar cliente por número de WhatsApp (Autopreenchimento no Checkout)
+async function lookupCustomerByPhone(req, res) {
+  try {
+    const { phone } = req.query;
+    if (!phone) {
+      return res.status(400).json({ found: false, message: 'Número de telefone é obrigatório.' });
+    }
+
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (!cleanPhone || cleanPhone.length < 8) {
+      return res.json({ found: false, message: 'Número de telefone inválido.' });
+    }
+
+    const result = await db.query('SELECT * FROM customers WHERE phone LIKE $1 OR phone = $2 LIMIT 1', [`%${cleanPhone}%`, cleanPhone]);
+
+    if (result.rows.length > 0) {
+      return res.json({ found: true, customer: result.rows[0] });
+    } else {
+      return res.json({ found: false, message: 'Nenhum cadastro prévio encontrado para este WhatsApp.' });
+    }
+  } catch (error) {
+    console.error('Erro na busca de cliente por telefone:', error);
+    return res.status(500).json({ found: false, error: 'Erro interno ao consultar cliente.' });
+  }
+}
+
 // Excluir cliente comprador por ID (Admin/Funcionário)
 async function deleteCustomer(req, res) {
   try {
@@ -62,5 +97,7 @@ async function deleteCustomer(req, res) {
 module.exports = {
   getCustomers,
   upsertCustomer,
+  lookupCustomerByPhone,
   deleteCustomer
 };
+

@@ -1,16 +1,10 @@
 {
   "schema-version": 1,
-  "feature-dir": "_reversa_forward/005-matriz-variacoes-bottons",
-  "feature-id": "005",
-  "short-name": "matriz-variacoes-bottons",
-  "started-at": "2026-08-09T18:30:00-03:00",
-  "current-stage": "coding",
-  "stages-completed": [
-    "requirements",
-    "clarify",
-    "plan",
-    "to-do",
-    "coding"
-  ],
+  "feature-dir": "_reversa_forward/007-reestruturacao-estoque-bottons-pedidos-dashboard",
+  "feature-id": "007",
+  "short-name": "reestruturacao-estoque-bottons-pedidos-dashboard",
+  "started-at": "2026-08-10T19:02:00-03:00",
+  "current-stage": "requirements",
+  "stages-completed": [],
   "paused-features": []
 }

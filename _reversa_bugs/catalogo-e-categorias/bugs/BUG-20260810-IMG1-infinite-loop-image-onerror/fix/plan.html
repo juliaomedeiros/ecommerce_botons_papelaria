@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Plano de Correção - BUG-008 (Loop Infinito onError Imagem)</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; padding: 30px; margin: 0; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+    h1 { color: #38bdf8; font-size: 1.6rem; margin-top: 0; }
+    h2 { color: #f1f5f9; font-size: 1.2rem; border-bottom: 1px solid #334155; padding-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #334155; padding: 10px; text-align: left; font-size: 0.9rem; }
+    th { background: #0f172a; color: #94a3b8; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; }
+    .badge-high { background: #ef4444; color: #fff; }
+    .badge-green { background: #22c55e; color: #fff; }
+    code { background: #0f172a; padding: 2px 6px; border-radius: 4px; color: #38bdf8; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h1>🛠️ Plano de Correção: BUG-008</h1>
+      <span class="badge badge-high">Severidade: HIGH</span>
+    </div>
+    <p><strong>Contexto:</strong> <code>catalogo-e-categorias</code> | <strong>ID Canônico:</strong> <code>BUG-20260810-IMG1-infinite-loop-image-onerror</code></p>
+  </div>
+
+  <div class="card">
+    <h2>1. Resumo do Defeito e Causa Raiz</h2>
+    <p><strong>Sintoma:</strong> Milhares de requisições HTTP em loop no DevTools (ultrapassando 8500 requisições) para <code>https://images.unsplash.com/...</code> travando o navegador ao carregar imagens de produtos no Admin e no Catálogo.</p>
+    <p><strong>Causa Raiz Confirmada:</strong> O manipulador <code>onError</code> nas tags <code>&lt;img&gt;</code> do React reatribuía o <code>e.target.src</code> para a imagem fallback do Unsplash sem anular <code>e.target.onerror = null</code>. Quando a imagem substituta também sofria erro de carregamento (CORS/rede), o evento disparava recursivamente em um loop infinito.</p>
+  </div>
+
+  <div class="card">
+    <h2>2. Estratégia de Correção</h2>
+    <p><strong>Estratégia Escolhida:</strong> Correção Direta Cirúrgica.</p>
+    <p>1. Anular <code>e.target.onerror = null;</code> antes de definir o fallback em todos os manipuladores de imagem do projeto.</p>
+    <p>2. Garantir a correta resolução e persistência da imagem enviada via upload no formulário de produtos do Admin.</p>
+  </div>
+
+  <div class="card">
+    <h2>3. Change Set Proposto</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>CHG</th>
+          <th>Tipo</th>
+          <th>Artefato</th>
+          <th>Propósito</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>CHG-001</td>
+          <td>code</td>
+          <td><code>frontend/src/components/AdminDashboard.jsx</code></td>
+          <td>Adicionar <code>e.target.onerror = null</code> e validar atribuição de foto no produto</td>
+        </tr>
+        <tr>
+          <td>CHG-002</td>
+          <td>code</td>
+          <td><code>frontend/src/components/Catalog.jsx</code></td>
+          <td>Adicionar <code>e.target.onerror = null</code> na imagem de fallback do catálogo</td>
+        </tr>
+        <tr>
+          <td>CHG-003</td>
+          <td>code</td>
+          <td><code>frontend/src/components/BottonMockupDisplay.jsx</code></td>
+          <td>Adicionar <code>e.target.onerror = null</code> na imagem do mockup 3D</td>
+        </tr>
+        <tr>
+          <td>CHG-004</td>
+          <td>code</td>
+          <td><code>frontend/src/components/ProductDetailModal.jsx</code></td>
+          <td>Adicionar <code>e.target.onerror = null</code> no modal de detalhes do produto</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

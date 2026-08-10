@@ -62,6 +62,13 @@ async function getProducts(req, res) {
     for (const prod of products) {
       const vars = await db.query('SELECT * FROM product_variations WHERE product_id = $1 ORDER BY diameter, finish_type', [prod.id]);
       prod.variations = vars.rows;
+      if (vars.rows && vars.rows.length > 0) {
+        prod.finish_type = vars.rows[0].finish_type;
+        prod.allowed_diameters = Array.from(new Set(vars.rows.map(v => v.diameter)));
+      } else {
+        prod.finish_type = 'alfinete';
+        prod.allowed_diameters = ['38mm', '25mm'];
+      }
     }
 
     return res.json(products);

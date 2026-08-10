@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Plano de Correção - BUG-010 (Persistência & Trava de Chaves de Integração)</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; padding: 30px; margin: 0; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+    h1 { color: #38bdf8; font-size: 1.6rem; margin-top: 0; }
+    h2 { color: #f1f5f9; font-size: 1.2rem; border-bottom: 1px solid #334155; padding-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #334155; padding: 10px; text-align: left; font-size: 0.9rem; }
+    th { background: #0f172a; color: #94a3b8; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; }
+    .badge-high { background: #ef4444; color: #fff; }
+    code { background: #0f172a; padding: 2px 6px; border-radius: 4px; color: #38bdf8; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h1>🛠️ Plano de Correção: BUG-010</h1>
+      <span class="badge badge-high">Severidade: HIGH / P0</span>
+    </div>
+    <p><strong>Contexto:</strong> <code>integracoes-e-configuracoes</code> | <strong>ID Canônico:</strong> <code>BUG-20260810-CFG1-persistencia-chaves-integracao</code></p>
+  </div>
+
+  <div class="card">
+    <h2>1. Resumo do Defeito e Causa Raiz</h2>
+    <p><strong>Sintoma:</strong> Na aba Integrações do Painel Admin, as chaves salvas do Mercado Pago e Evolution API perdem os valores nos campos ao recarregar, e os campos permanecem constantemente editáveis em vez de ficarem desabilitados e protegidos.</p>
+    <p><strong>Causa Raiz Confirmada:</strong> O <code>configController.js</code> expunha chaves privadas via <code>GET /api/config</code> público e não sanitizava o retorno do PostgreSQL. Além disso, faltava o endpoint protegido <code>GET /api/admin/config</code> com autenticação JWT e os estados no React (<code>isEditingMp</code>, <code>isEditingEvo</code>) para travar os campos em modo leitura/desabilitado.</p>
+  </div>
+
+  <div class="card">
+    <h2>2. Estratégia de Correção</h2>
+    <p><strong>Estratégia Escolhida:</strong> Persistência em PostgreSQL + Endpoint Protegido + Trava Visual de Edição no Admin (Bloqueado/Salvo vs Editar).</p>
+    <p>1. Criar endpoint protegido <code>GET /api/admin/config</code> com JWT Admin para carregar credenciais reais do PostgreSQL.</p>
+    <p>2. Ocultar dados sensíveis no <code>GET /api/config</code> público (preservando apenas chaves públicas necessárias).</p>
+    <p>3. Adicionar trava visual com botões <em>"🔓 Editar Integração"</em> / <em>"💾 Salvar Integração"</em> em <code>AdminDashboard.jsx</code> que mantém os campos desabilitados e protegidos após salvar.</p>
+  </div>
+
+  <div class="card">
+    <h2>3. Change Set Proposto</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>CHG</th>
+          <th>Tipo</th>
+          <th>Artefato</th>
+          <th>Propósito</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>CHG-001</td>
+          <td>code</td>
+          <td><code>backend/src/controllers/configController.js</code></td>
+          <td>Criar <code>getAdminConfig</code> seguro e sanitizar <code>getConfig</code> público.</td>
+        </tr>
+        <tr>
+          <td>CHG-002</td>
+          <td>code</td>
+          <td><code>backend/src/server.js</code></td>
+          <td>Registrar rota protegida <code>GET /api/admin/config</code> com <code>verifyToken</code> e <code>requireRole(['admin'])</code>.</td>
+        </tr>
+        <tr>
+          <td>CHG-003</td>
+          <td>code</td>
+          <td><code>frontend/src/components/AdminDashboard.jsx</code></td>
+          <td>Adicionar trava visual (<code>isEditingMp</code>, <code>isEditingEvo</code>) e campos desabilitados em modo leitura.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

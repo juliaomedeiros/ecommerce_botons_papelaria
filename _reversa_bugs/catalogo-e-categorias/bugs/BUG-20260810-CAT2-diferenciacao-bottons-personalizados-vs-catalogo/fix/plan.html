@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Plano de Correção - BUG-011 (Diferenciação 3D Catálogo vs Personalizados e Popup Pós-Carrinho)</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; padding: 30px; margin: 0; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+    h1 { color: #38bdf8; font-size: 1.6rem; margin-top: 0; }
+    h2 { color: #f1f5f9; font-size: 1.2rem; border-bottom: 1px solid #334155; padding-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #334155; padding: 10px; text-align: left; font-size: 0.9rem; }
+    th { background: #0f172a; color: #94a3b8; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; }
+    .badge-high { background: #ef4444; color: #fff; }
+    code { background: #0f172a; padding: 2px 6px; border-radius: 4px; color: #38bdf8; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h1>🛠️ Plano de Correção: BUG-011</h1>
+      <span class="badge badge-high">Severidade: HIGH / P0</span>
+    </div>
+    <p><strong>Contexto:</strong> <code>catalogo-e-categorias</code> | <strong>ID Canônico:</strong> <code>BUG-20260810-CAT2-diferenciacao-bottons-personalizados-vs-catalogo</code></p>
+  </div>
+
+  <div class="card">
+    <h2>1. Resumo do Defeito e Causa Raiz</h2>
+    <p><strong>Sintoma:</strong> Produtos da categoria <em>"Bottons Personalizados"</em> exibiam erroneamente o mockup 3D de rotação frente/verso no catálogo, em vez de uma imagem normal. Além disso, faltava o popup de decisão ao adicionar o botton customizado no carrinho (Ir para o Pagamento vs Continuar Comprando).</p>
+    <p><strong>Causa Raiz Confirmada:</strong> A variável <code>isBottonProduct</code> em <code>Catalog.jsx</code> verificava se a palavra 'botton' existia no nome/categoria, ativando o <code>BottonMockupDisplay</code> para personalizados. E o modal do Canva 3D fechava diretamente para a gaveta do carrinho sem dar a opção ao comprador de continuar navegando.</p>
+  </div>
+
+  <div class="card">
+    <h2>2. Estratégia de Correção</h2>
+    <p>1. <strong>Regra Estrita de Exibição 3D:</strong> O <code>BottonMockupDisplay</code> (frente/verso rotativo) só será exibido para a categoria <strong>Bottons</strong> (estampas de catálogo não-personalizáveis). A categoria <strong>Bottons Personalizados</strong> exibirá a <strong>imagem estática normal</strong> do produto.</p>
+    <p>2. <strong>Botão do Card Personalizável:</strong> No card da categoria Bottons Personalizados, o botão será obrigatoriamente <em>"✨ Personalize com sua imagem"</em>, direcionando para o Canva 3D.</p>
+    <p>3. <strong>Popup de Decisão Pós-Adição ao Carrinho:</strong> Ao concluir no Canva 3D e adicionar ao carrinho, exibiremos um popup modal com duas opções claras: 💳 <em>"Ir para o Pagamento"</em> (abre checkout) ou 🛍️ <em>"Continuar Comprando"</em> (mantém no catálogo).</p>
+  </div>
+
+  <div class="card">
+    <h2>3. Change Set Proposto</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>CHG</th>
+          <th>Tipo</th>
+          <th>Artefato</th>
+          <th>Propósito</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>CHG-001</td>
+          <td>code</td>
+          <td><code>frontend/src/components/Catalog.jsx</code></td>
+          <td>Isolar 3D apenas para a categoria <em>Bottons</em> e exibir imagem normal para <em>Bottons Personalizados</em> com botão <em>Personalize com sua imagem</em>.</td>
+        </tr>
+        <tr>
+          <td>CHG-002</td>
+          <td>code</td>
+          <td><code>frontend/src/components/AddToCartSuccessModal.jsx</code></td>
+          <td>Criar modal de decisão pós-adição ao carrinho (<em>Ir para o Pagamento</em> vs <em>Continuar Comprando</em>).</td>
+        </tr>
+        <tr>
+          <td>CHG-003</td>
+          <td>code</td>
+          <td><code>frontend/src/App.jsx</code></td>
+          <td>Integrar o <code>AddToCartSuccessModal</code> ao fluxo do Canva 3D e carrinho.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

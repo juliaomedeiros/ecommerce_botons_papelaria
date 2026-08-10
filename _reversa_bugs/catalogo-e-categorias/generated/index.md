@@ -1,15 +1,23 @@
-# Índice de Bugs — Contexto: Catálogo e Categorias (`catalogo-e-categorias`)
+<!-- GENERATED, DO NOT EDIT: regenerado por /reversa-debugger em 2026-08-10T20:08:00-03:00 a partir de 3 bugs -->
 
-> Atualizado em 2026-08-09. Projeção regenerável por `/reversa-debugger-graph`.
+# Índice de Bugs · Contexto `catalogo-e-categorias`
 
-## Status dos Bugs
+## Resumo de Status
 
-| ID Canônico | Apelido | Título | Severidade | Prioridade | Status | Fase | Labels |
-|-------------|---------|--------|------------|------------|--------|------|--------|
-| [BUG-20260809-C4T1](../bugs/BUG-20260809-C4T1-dropdown-categorias-admin/bug.md) | #1 | Dropdown de categorias no formulário do Admin não exibe nem vincula categorias das abas do /home | Medium | P1 | Resolved (Fixed) | Patching | `spec-gap`, `ux` |
+| Status | Quantidade |
+|--------|------------|
+| `open` | 0 |
+| `resolved` | 3 |
+| **Total** | **3** |
 
-## Estatísticas
-- Total de bugs no contexto: 1
-- Abertos: 0
-- Em andamento: 0
-- Resolvidos: 1 (🔒 100%)
+## Bugs Abertos / Ativos
+
+*(Nenhum bug aberto neste contexto)*
+
+## Bugs Resolvidos
+
+| # | ID | Severidade | Prioridade | Área / Módulo | Título | Resolution |
+|---|----|------------|------------|---------------|--------|------------|
+| 1 | `BUG-20260809-C4T1-dropdown-categorias-admin` | `medium` | `p1` | catalogo-e-categorias / catalog | Dropdown de categorias no formulário do Admin não exibe nem vincula categorias das abas do /home | `fixed` |
+| 8 | `BUG-20260810-IMG1-infinite-loop-image-onerror` | `high` | `p1` | catalogo-e-categorias / catalog | Request em loop infinito no devtools (onError img) e falha de carregamento de foto no admin | `fixed` |
+| 11 | `BUG-20260810-CAT2-diferenciacao-bottons-personalizados-vs-catalogo` | `high` | `p0` | catalogo-e-categorias / catalog | Exibição Exclusiva de Mockup 3D em Bottons do Catálogo e Fluxo Canva/Decisão de Carrinho em Bottons Personalizados | `fixed` |

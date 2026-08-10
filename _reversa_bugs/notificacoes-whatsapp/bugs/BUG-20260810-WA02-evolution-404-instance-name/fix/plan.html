@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Plano de Correção - BUG-009 (Notificações WhatsApp HTTP 404)</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; padding: 30px; margin: 0; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+    h1 { color: #38bdf8; font-size: 1.6rem; margin-top: 0; }
+    h2 { color: #f1f5f9; font-size: 1.2rem; border-bottom: 1px solid #334155; padding-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #334155; padding: 10px; text-align: left; font-size: 0.9rem; }
+    th { background: #0f172a; color: #94a3b8; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; }
+    .badge-high { background: #ef4444; color: #fff; }
+    code { background: #0f172a; padding: 2px 6px; border-radius: 4px; color: #38bdf8; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h1>🛠️ Plano de Correção: BUG-009</h1>
+      <span class="badge badge-high">Severidade: HIGH / P0</span>
+    </div>
+    <p><strong>Contexto:</strong> <code>notificacoes-whatsapp</code> | <strong>ID Canônico:</strong> <code>BUG-20260810-WA02-evolution-404-instance-name</code></p>
+  </div>
+
+  <div class="card">
+    <h2>1. Resumo do Defeito e Causa Raiz</h2>
+    <p><strong>Sintoma:</strong> Pedidos finalizados chegam na fila de produção, mas notificações no WhatsApp do Admin e Cliente falham com erro HTTP 404 nos logs do Evolution Go.</p>
+    <p><strong>Causa Raiz Confirmada:</strong> O <code>whatsappService.js</code> fazia requisições HTTP para a Evolution Go com a string de instância fixada como <code>/tutaspaper</code>. A instância conectada no contêiner possui o ID/nome dinâmico <code>67076b2d-edce-4f7f-8478-7c7eb38cc27d</code>, fazendo a Evolution Go retornar HTTP 404 Not Found.</p>
+  </div>
+
+  <div class="card">
+    <h2>2. Estratégia de Correção</h2>
+    <p><strong>Estratégia Escolhida:</strong> Resolução Dinâmica de Instância e Envio Real.</p>
+    <p>1. Criar função <code>getActiveEvolutionConfig()</code> para ler <code>store_config</code> do PostgreSQL e consultar <code>GET /instance/all</code> na Evolution Go para auto-detectar o nome/ID da instância conectada.</p>
+    <p>2. Substituir a string fixa <code>/tutaspaper</code> em todos os endpoints da fila pelo nome dinâmico da instância conectada.</p>
+    <p>3. Remover a restrição rígida de <code>NODE_ENV === 'production'</code>.</p>
+  </div>
+
+  <div class="card">
+    <h2>3. Change Set Proposto</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>CHG</th>
+          <th>Tipo</th>
+          <th>Artefato</th>
+          <th>Propósito</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>CHG-001</td>
+          <td>code</td>
+          <td><code>backend/src/services/whatsappService.js</code></td>
+          <td>Implementar resolução dinâmica de instância via <code>store_config</code> / <code>GET /instance/all</code> e remover URLs fixas.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

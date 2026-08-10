@@ -44,7 +44,7 @@ services:
       - uploads_data:/app/uploads
 
   evolution-api:
-    image: evoapicloud/evolution-go:latest
+    image: evoapicloud/evolution-go:0.7.2
     container_name: tutaspaper_evolution_go
     restart: always
     environment:

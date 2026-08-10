@@ -36,6 +36,33 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
   const [evoKey, setEvoKey] = useState('tutas_evolution_key');
   const [evoInstance, setEvoInstance] = useState('tutaspaper');
   const [adminPhone, setAdminPhone] = useState('');
+  const [waStatus, setWaStatus] = useState({ connected: false, loading: false, message: '' });
+  const [isEditingMp, setIsEditingMp] = useState(false);
+  const [isEditingEvo, setIsEditingEvo] = useState(false);
+
+  useEffect(() => {
+    if (token && activeTab === 'integrations') {
+      fetchWaStatus();
+    }
+  }, [token, activeTab]);
+
+  async function fetchWaStatus() {
+    setWaStatus(prev => ({ ...prev, loading: true }));
+    try {
+      const res = await fetch('/api/admin/whatsapp/status', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setWaStatus({ connected: data.connected === true, loading: false, message: data.message });
+      } else {
+        setWaStatus({ connected: false, loading: false, message: 'Não foi possível consultar status' });
+      }
+    } catch (err) {
+      setWaStatus({ connected: false, loading: false, message: err.message });
+    }
+  }
+
 
   // Form de Produto
   const [prodName, setProdName] = useState('');
@@ -47,6 +74,9 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
   const [prodMaxLimit, setProdMaxLimit] = useState('100');
   const [prodImg, setProdImg] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [prodFinishType, setProdFinishType] = useState('alfinete');
+  const [prodSize38, setProdSize38] = useState(true);
+  const [prodSize25, setProdSize25] = useState(true);
 
   // Estados para edição via Lápis na tabela
   const [editingProdId, setEditingProdId] = useState(null);
@@ -140,8 +170,38 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
       }
       if (activeTab === 'customers') fetchCustomers();
       if (activeTab === 'users' && userRole === 'admin') fetchAdminUsers();
+      if (activeTab === 'integrations' && userRole === 'admin') fetchAdminConfig();
     }
   }, [token, activeTab]);
+
+  async function fetchAdminConfig() {
+    try {
+      const res = await fetch('/api/admin/config', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.mp_environment) setMpEnvironment(data.mp_environment);
+        if (data.mp_public_key !== undefined) setMpPublicKey(data.mp_public_key);
+        if (data.mercadopago_token !== undefined) setMpAccessToken(data.mercadopago_token);
+        if (data.mp_webhook_secret !== undefined) setMpWebhookSecret(data.mp_webhook_secret);
+        if (data.evolution_api_url) setEvoUrl(data.evolution_api_url);
+        if (data.evolution_api_key !== undefined) setEvoKey(data.evolution_api_key);
+        if (data.evolution_instance_name) setEvoInstance(data.evolution_instance_name);
+        if (data.admin_phone !== undefined) setAdminPhone(data.admin_phone);
+
+        // Se houver chaves de MP salvas, desabilitar formulário por padrão
+        if (data.mercadopago_token || data.mp_public_key) setIsEditingMp(false);
+        else setIsEditingMp(true);
+
+        // Se houver chaves de Evo salvas, desabilitar formulário por padrão
+        if (data.evolution_api_key || data.evolution_api_url) setIsEditingEvo(false);
+        else setIsEditingEvo(true);
+      }
+    } catch (err) {
+      console.log('Erro ao carregar configs administrativas:', err.message);
+    }
+  }
 
   async function fetchCategories() {
     try {
@@ -228,32 +288,28 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
     }
   }
 
-  // Upload de Imagem de Produto (Arquivo Físico)
+  // Upload de Imagem de Produto (Convertido para Base64 e salvo no Banco de Dados)
   async function handleProductFileUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
 
-    const formData = new FormData();
-    formData.append('image', file);
+    if (file.size > 5 * 1024 * 1024) {
+      alert('A foto é muito grande. Escolha um arquivo de imagem de até 5MB.');
+      return;
+    }
 
     setUploadingImage(true);
-    try {
-      const res = await fetch('/api/admin/upload-product-image', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData
-      });
-      const data = await res.json();
-      if (res.ok && data.imageUrl) {
-        setProdImg(data.imageUrl);
-      } else {
-        alert(data.error || 'Erro ao enviar imagem.');
-      }
-    } catch (err) {
-      alert('Erro ao realizar upload da imagem.');
-    } finally {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64Data = event.target.result;
+      setProdImg(base64Data);
       setUploadingImage(false);
-    }
+    };
+    reader.onerror = () => {
+      alert('Erro ao ler a foto do computador.');
+      setUploadingImage(false);
+    };
+    reader.readAsDataURL(file);
   }
 
   // Finalizar Pedido & Notificar WhatsApp do Comprador
@@ -365,19 +421,34 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
     let variationsArray = [];
 
     if (isBottonCat) {
-      variationsArray = [
-        { diameter: '25mm', finish_type: 'alfinete', price_override: parseFloat(varMatrix['25mm_alfinete'].price), stock_quantity: parseInt(varMatrix['25mm_alfinete'].stock) || 0, max_limit_per_order: parseInt(varMatrix['25mm_alfinete'].maxLimit) || 50 },
-        { diameter: '25mm', finish_type: 'chaveiro', price_override: parseFloat(varMatrix['25mm_chaveiro'].price), stock_quantity: parseInt(varMatrix['25mm_chaveiro'].stock) || 0, max_limit_per_order: parseInt(varMatrix['25mm_chaveiro'].maxLimit) || 30 },
-        { diameter: '25mm', finish_type: 'ima', price_override: parseFloat(varMatrix['25mm_ima'].price), stock_quantity: parseInt(varMatrix['25mm_ima'].stock) || 0, max_limit_per_order: parseInt(varMatrix['25mm_ima'].maxLimit) || 25 },
-        { diameter: '38mm', finish_type: 'alfinete', price_override: parseFloat(varMatrix['38mm_alfinete'].price), stock_quantity: parseInt(varMatrix['38mm_alfinete'].stock) || 0, max_limit_per_order: parseInt(varMatrix['38mm_alfinete'].maxLimit) || 100 },
-        { diameter: '38mm', finish_type: 'chaveiro', price_override: parseFloat(varMatrix['38mm_chaveiro'].price), stock_quantity: parseInt(varMatrix['38mm_chaveiro'].stock) || 0, max_limit_per_order: parseInt(varMatrix['38mm_chaveiro'].maxLimit) || 50 },
-        { diameter: '38mm', finish_type: 'ima', price_override: parseFloat(varMatrix['38mm_ima'].price), stock_quantity: parseInt(varMatrix['38mm_ima'].stock) || 0, max_limit_per_order: parseInt(varMatrix['38mm_ima'].maxLimit) || 35 }
-      ];
+      if (!prodSize38 && !prodSize25) {
+        alert('Erro: Escolha pelo menos um tamanho (38mm ou 25mm).');
+        return;
+      }
+      variationsArray = [];
+      if (prodSize38) {
+        variationsArray.push({
+          diameter: '38mm',
+          finish_type: prodFinishType,
+          price_override: parseFloat(varMatrix[`38mm_${prodFinishType}`]?.price || prodPrice || 6.00),
+          stock_quantity: parseInt(varMatrix[`38mm_${prodFinishType}`]?.stock || prodStock || 0),
+          max_limit_per_order: parseInt(varMatrix[`38mm_${prodFinishType}`]?.maxLimit || prodMaxLimit || 100)
+        });
+      }
+      if (prodSize25) {
+        variationsArray.push({
+          diameter: '25mm',
+          finish_type: prodFinishType,
+          price_override: parseFloat(varMatrix[`25mm_${prodFinishType}`]?.price || prodPrice || 5.00),
+          stock_quantity: parseInt(varMatrix[`25mm_${prodFinishType}`]?.stock || prodStock || 0),
+          max_limit_per_order: parseInt(varMatrix[`25mm_${prodFinishType}`]?.maxLimit || prodMaxLimit || 50)
+        });
+      }
 
       // Validar cada variação
       for (const v of variationsArray) {
         if (v.max_limit_per_order > v.stock_quantity && v.stock_quantity > 0) {
-          alert(`Erro de Validação na Variação (${v.diameter} - ${v.finish_type}): O limite por compra (${v.max_limit_per_order}) não pode ser maior que o estoque (${v.stock_quantity}).`);
+          alert(`Erro de Validação (${v.diameter} - ${v.finish_type}): O limite por compra (${v.max_limit_per_order}) não pode ser maior que o estoque (${v.stock_quantity}).`);
           return;
         }
       }
@@ -397,7 +468,7 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
         base_price: parseFloat(prodPrice || 5.00),
         stock_quantity: finalStockVal,
         max_limit_per_order: finalMaxLimitVal || 100,
-        image_url: prodImg || 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=500&auto=format&fit=crop&q=60',
+        image_url: prodImg || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23e2e8f0'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' fill='%2364748b'%3ESem Imagem%3C/text%3E%3C/svg%3E",
         variations: isBottonCat ? variationsArray : []
       };
 
@@ -527,9 +598,9 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
     }
   }
 
-  // Salvar Integrações Mercado Pago & Evolution API
-  async function handleSaveIntegrations(e) {
-    e.preventDefault();
+  // Salvar Apenas Integração Mercado Pago
+  async function handleSaveMercadoPago(e) {
+    if (e) e.preventDefault();
     try {
       const res = await fetch('/api/admin/config', {
         method: 'POST',
@@ -541,7 +612,33 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
           mp_environment: mpEnvironment,
           mp_public_key: mpPublicKey,
           mercadopago_token: mpAccessToken,
-          mp_webhook_secret: mpWebhookSecret,
+          mp_webhook_secret: mpWebhookSecret
+        })
+      });
+
+      if (res.ok) {
+        alert('Configurações do Mercado Pago salvas no PostgreSQL e travadas com sucesso!');
+        setIsEditingMp(false);
+        fetchAdminConfig();
+      } else {
+        alert('Erro ao salvar Mercado Pago.');
+      }
+    } catch (err) {
+      alert('Erro de conexão ao salvar Mercado Pago.');
+    }
+  }
+
+  // Salvar Apenas Integração Evolution API (WhatsApp)
+  async function handleSaveEvolutionConfig(e) {
+    if (e) e.preventDefault();
+    try {
+      const res = await fetch('/api/admin/config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
           evolution_api_url: evoUrl,
           evolution_api_key: evoKey,
           evolution_instance_name: evoInstance,
@@ -549,14 +646,15 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
         })
       });
 
-      const data = await res.json();
       if (res.ok) {
-        alert('Configurações de Mercado Pago, Evolution API e WhatsApp do Admin salvas com sucesso!');
+        alert('Configurações do WhatsApp/Evolution salvas no PostgreSQL e travadas com sucesso!');
+        setIsEditingEvo(false);
+        fetchAdminConfig();
       } else {
-        alert('Erro ao salvar configurações.');
+        alert('Erro ao salvar WhatsApp.');
       }
     } catch (err) {
-      alert('Erro de conexão ao salvar integrações.');
+      alert('Erro de conexão ao salvar WhatsApp.');
     }
   }
 
@@ -579,6 +677,7 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
       console.log('Modo 24h alterado:', nextVal);
     }
   }
+
 
   // Limpar Dados de Exemplo
   async function handleResetDemoData() {
@@ -734,7 +833,7 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
                 onClick={() => setActiveTab('production')}
                 style={{ padding: '16px 20px', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}
               >
-                <Layers size={18} /> Fila Noturna
+                <Layers size={18} /> Lista de Pedidos
               </button>
 
               <button
@@ -858,24 +957,24 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
               </div>
             )}
 
-            {/* Aba 1: Fila de Prensa Noturna (Central Única de Pedidos & WhatsApp) */}
+            {/* Aba 1: Lista de Pedidos (Central Única de Produção & WhatsApp) */}
             {activeTab === 'production' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                   <div>
-                    <h2 style={{ fontSize: '1.5rem', color: 'var(--primary)', marginBottom: '4px' }}>Fila Noturna de Impressão e Prensa</h2>
+                    <h2 style={{ fontSize: '1.5rem', color: 'var(--primary)', marginBottom: '4px' }}>Lista de Pedidos (Produção & Prensa)</h2>
                     <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Baixe a imagem formatada e ao concluir o pedido, notifique o comprador no WhatsApp.</p>
                   </div>
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <button className="btn btn-outline" onClick={fetchProductionQueue} style={{ padding: '8px 16px', fontSize: '0.9rem' }}>
-                      <RefreshCw size={16} /> Atualizar Fila
+                      <RefreshCw size={16} /> Atualizar Lista
                     </button>
                   </div>
                 </div>
 
                 {productionQueue.length === 0 ? (
                   <div className="card" style={{ textAlign: 'center', padding: '50px 20px', color: '#64748b' }}>
-                    Nenhum pedido pendente na fila noturna de impressão.
+                    Nenhum pedido pendente na lista de pedidos.
                   </div>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
@@ -956,75 +1055,70 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
                     </div>
                   </div>
 
-                  {/* Se a categoria selecionada for 'Bottons', exibir a matriz de 6 variações com preço, estoque e limite por compra */}
+                  {/* Se a categoria selecionada for 'Bottons', exibir seleção de acabamento único e tamanhos habilitados */}
                   {(prodCategoryId === 'cat-bottons-001' || categoriesList.find(c => c.id === prodCategoryId)?.slug === 'bottons') ? (
                     <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <h4 style={{ fontSize: '0.95rem', fontWeight: '800', color: 'var(--primary)', margin: 0, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          🎛️ Matriz de Variações (Tamanho x Acabamento Verso)
-                        </h4>
-                        <span style={{ fontSize: '0.75rem', background: '#e2e8f0', color: '#475569', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>
-                          Estoque Total Calculado: {
-                            Object.values(varMatrix).reduce((acc, curr) => acc + (parseInt(curr.stock) || 0), 0)
-                          } un.
-                        </span>
-                      </div>
-                      <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>
-                        Configure o preço, estoque total e limite por compra para cada combinação disponível:
-                      </p>
+                      <h4 style={{ fontSize: '0.95rem', fontWeight: '800', color: 'var(--primary)', margin: 0, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        🎛️ Configuração do Modelo (Acabamento & Tamanhos Habilitados)
+                      </h4>
 
-                      <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', fontSize: '0.82rem', borderCollapse: 'collapse' }}>
-                          <thead>
-                            <tr style={{ background: '#e2e8f0', color: 'var(--primary)', textAlign: 'left' }}>
-                              <th style={{ padding: '8px 10px', borderRadius: '6px 0 0 6px' }}>Tamanho</th>
-                              <th style={{ padding: '8px 10px' }}>Acabamento Verso</th>
-                              <th style={{ padding: '8px 10px' }}>Preço Venda (R$)</th>
-                              <th style={{ padding: '8px 10px' }}>Estoque Total (un.)</th>
-                              <th style={{ padding: '8px 10px', borderRadius: '0 6px 6px 0' }}>Limite Máx. por Compra</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {[
-                              { key: '25mm_alfinete', size: '25mm (Pequeno)', finish: '🧷 Alfinete de Metal' },
-                              { key: '25mm_chaveiro', size: '25mm (Pequeno)', finish: '🔑 Chaveiro 2 Faces' },
-                              { key: '25mm_ima', size: '25mm (Pequeno)', finish: '🧲 Ímã de Geladeira' },
-                              { key: '38mm_alfinete', size: '38mm (Padrão)', finish: '🧷 Alfinete de Metal' },
-                              { key: '38mm_chaveiro', size: '38mm (Padrão)', finish: '🔑 Chaveiro 2 Faces' },
-                              { key: '38mm_ima', size: '38mm (Padrão)', finish: '🧲 Ímã de Geladeira' }
-                            ].map(row => (
-                              <tr key={row.key} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                                <td style={{ padding: '8px 10px', fontWeight: 'bold' }}>{row.size}</td>
-                                <td style={{ padding: '8px 10px' }}>{row.finish}</td>
-                                <td style={{ padding: '8px 10px' }}>
-                                  <input
-                                    type="number"
-                                    step="0.50"
-                                    value={varMatrix[row.key]?.price || ''}
-                                    onChange={e => setVarMatrix({ ...varMatrix, [row.key]: { ...varMatrix[row.key], price: e.target.value } })}
-                                    style={{ width: '85px', padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                                  />
-                                </td>
-                                <td style={{ padding: '8px 10px' }}>
-                                  <input
-                                    type="number"
-                                    value={varMatrix[row.key]?.stock || ''}
-                                    onChange={e => setVarMatrix({ ...varMatrix, [row.key]: { ...varMatrix[row.key], stock: e.target.value } })}
-                                    style={{ width: '85px', padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                                  />
-                                </td>
-                                <td style={{ padding: '8px 10px' }}>
-                                  <input
-                                    type="number"
-                                    value={varMatrix[row.key]?.maxLimit || ''}
-                                    onChange={e => setVarMatrix({ ...varMatrix, [row.key]: { ...varMatrix[row.key], maxLimit: e.target.value } })}
-                                    style={{ width: '85px', padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                                  />
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>
+                            Acabamento de Verso (Apenas 1) *
+                          </label>
+                          <select
+                            value={prodFinishType}
+                            onChange={e => setProdFinishType(e.target.value)}
+                            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}
+                            required
+                          >
+                            <option value="alfinete">🧷 Alfinete de Metal</option>
+                            <option value="chaveiro">🔑 Chaveiro 2 Faces</option>
+                            <option value="ima">🧲 Ímã de Geladeira</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>
+                            Tamanhos Disponíveis para Comprador *
+                          </label>
+                          <div style={{ display: 'flex', gap: '16px', alignItems: 'center', height: '42px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.9rem', cursor: 'pointer', fontWeight: '600' }}>
+                              <input
+                                type="checkbox"
+                                checked={prodSize38}
+                                onChange={e => setProdSize38(e.target.checked)}
+                                style={{ width: '18px', height: '18px', accentColor: 'var(--primary)' }}
+                              />
+                              38mm (Padrão)
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.9rem', cursor: 'pointer', fontWeight: '600' }}>
+                              <input
+                                type="checkbox"
+                                checked={prodSize25}
+                                onChange={e => setProdSize25(e.target.checked)}
+                                style={{ width: '18px', height: '18px', accentColor: 'var(--primary)' }}
+                              />
+                              25mm (Pequeno)
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>Preço Venda (R$)</label>
+                          <input type="number" step="0.50" value={prodPrice} onChange={e => setProdPrice(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} required />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>Estoque em Unidades</label>
+                          <input type="number" value={prodStock} onChange={e => setProdStock(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} required />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>Limite Máx. por Compra</label>
+                          <input type="number" value={prodMaxLimit} onChange={e => setProdMaxLimit(e.target.value)} placeholder="Ex: 50" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} required />
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -1044,14 +1138,14 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
                     </div>
                   )}
 
-                  {/* Upload de Imagem Físico + URL */}
+                  {/* Upload de Imagem Físico Exclusivo do PC */}
                   <div>
                     <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>
-                      Foto do Produto (Upload de Arquivo ou URL)
+                      Foto do Produto (Upload do Arquivo do Computador)
                     </label>
                     <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
                       <label className="btn btn-outline" style={{ cursor: 'pointer', padding: '10px 16px', fontSize: '0.88rem', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                        <Upload size={16} /> {uploadingImage ? 'Enviando Foto...' : 'Upload de Arquivo de Foto'}
+                        <Upload size={16} /> {uploadingImage ? 'Enviando Foto...' : 'Selecionar Foto no Computador'}
                         <input
                           type="file"
                           accept="image/*"
@@ -1061,25 +1155,23 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
                         />
                       </label>
 
-                      <span style={{ fontSize: '0.85rem', color: '#64748b' }}>ou cole a URL:</span>
-
-                      <input
-                        type="url"
-                        value={prodImg}
-                        onChange={e => setProdImg(e.target.value)}
-                        placeholder="https://exemplo.com/imagem-produto.jpg"
-                        style={{ flex: 1, minWidth: '220px', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}
-                      />
-
                       {prodImg && (
-                        <img
-                          src={prodImg}
-                          alt="Prévia"
-                          style={{ width: '44px', height: '44px', borderRadius: '8px', objectFit: 'cover', border: '2px solid var(--secondary)' }}
-                        />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <img
+                            src={prodImg}
+                            alt="Prévia"
+                            style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover', border: '2px solid var(--secondary)' }}
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23e2e8f0'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' fill='%2364748b'%3ESem Imagem%3C/text%3E%3C/svg%3E";
+                                }}
+                          />
+                          <span style={{ fontSize: '0.8rem', color: '#166534', fontWeight: 'bold' }}>✓ Imagem carregada</span>
+                        </div>
                       )}
                     </div>
                   </div>
+
 
                   <div>
                     <button type="submit" className="btn btn-primary" style={{ padding: '10px 20px', fontSize: '0.95rem' }}>
@@ -1117,7 +1209,10 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
                                 src={prod.image_url}
                                 alt={prod.name}
                                 style={{ width: '40px', height: '40px', borderRadius: '6px', objectFit: 'cover' }}
-                                onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=500&auto=format&fit=crop&q=60'; }}
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23e2e8f0'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' fill='%2364748b'%3ESem Imagem%3C/text%3E%3C/svg%3E";
+                                }}
                               />
                             </td>
                             <td style={{ padding: '14px 20px', fontWeight: '700', color: '#0f172a' }}>{prod.name}</td>
@@ -1403,25 +1498,29 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
             {activeTab === 'integrations' && userRole === 'admin' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 
-                <form onSubmit={handleSaveIntegrations} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  
-                  {/* Seção A: Mercado Pago (Homologação & Produção) */}
-                  <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', border: '1px solid #bcecf0' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                      <div>
-                        <h3 style={{ fontSize: '1.2rem', color: 'var(--primary)', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <CreditCard size={22} color="var(--primary)" /> Integração Mercado Pago (Pix & Cartão)
-                        </h3>
-                        <p style={{ fontSize: '0.88rem', color: '#64748b', marginTop: '2px' }}>
-                          Defina as chaves da sua conta Mercado Pago para ativação do Checkout Transparente Pix.
-                        </p>
-                      </div>
+                {/* Seção A: Mercado Pago (Homologação & Produção) */}
+                <form onSubmit={handleSaveMercadoPago} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', border: '1px solid #bcecf0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                    <div>
+                      <h3 style={{ fontSize: '1.2rem', color: 'var(--primary)', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <CreditCard size={22} color="var(--primary)" /> Integração Mercado Pago (Pix & Cartão)
+                        {!isEditingMp && (
+                          <span className="badge badge-green" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>
+                            🔒 Credenciais Salvas & Protegidas
+                          </span>
+                        )}
+                      </h3>
+                      <p style={{ fontSize: '0.88rem', color: '#64748b', marginTop: '2px' }}>
+                        Defina as chaves da sua conta Mercado Pago para ativação do Checkout Transparente Pix.
+                      </p>
+                    </div>
 
-                      {/* Alternador Sandbox / Produção */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '0.85rem', fontWeight: '700', color: mpEnvironment === 'sandbox' ? '#0e5864' : '#166534' }}>
-                          Modo: {mpEnvironment === 'sandbox' ? '🧪 HOMOLOGAÇÃO (SANDBOX)' : '🚀 PRODUÇÃO (REAL)'}
-                        </span>
+                    {/* Alternador Sandbox / Produção */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: '700', color: mpEnvironment === 'sandbox' ? '#0e5864' : '#166534' }}>
+                        Modo: {mpEnvironment === 'sandbox' ? '🧪 HOMOLOGAÇÃO (SANDBOX)' : '🚀 PRODUÇÃO (REAL)'}
+                      </span>
+                      {isEditingMp && (
                         <button
                           type="button"
                           className={`btn ${mpEnvironment === 'sandbox' ? 'btn-outline' : 'btn-secondary'}`}
@@ -1430,140 +1529,188 @@ export default function AdminDashboard({ isOpen, isEventoMode, onToggleEventoMod
                         >
                           Alternar para {mpEnvironment === 'sandbox' ? 'PRODUÇÃO' : 'SANDBOX'}
                         </button>
-                      </div>
-                    </div>
-
-                    <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#334155' }}>
-                      💡 <strong>Como vincular o Mercado Pago:</strong> Acesse seu painel no <a href="https://www.mercadopago.com.br/developers" target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>Mercado Pago Developers</a> e copie as chaves da sua aplicação.
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>
-                          Mercado Pago Access Token *
-                        </label>
-                        <input
-                          type="password"
-                          value={mpAccessToken}
-                          onChange={e => setMpAccessToken(e.target.value)}
-                          placeholder="APP_USR-xxxxxxxxx..."
-                          style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>
-                          Mercado Pago Public Key
-                        </label>
-                        <input
-                          type="text"
-                          value={mpPublicKey}
-                          onChange={e => setMpPublicKey(e.target.value)}
-                          placeholder="APP_USR-xxxxxxxxx..."
-                          style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
-                        />
-                      </div>
-
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>
-                          Mercado Pago Webhook Secret (Notificação Pix)
-                        </label>
-                        <input
-                          type="password"
-                          value={mpWebhookSecret}
-                          onChange={e => setMpWebhookSecret(e.target.value)}
-                          placeholder="Secret do Webhook de confirmação Pix"
-                          style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
-                        />
-                      </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Seção B: Evolution API (WhatsApp Notifications) */}
-                  <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <h3 style={{ fontSize: '1.2rem', color: 'var(--primary)', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <MessageSquare size={22} color="var(--primary)" /> Integração Evolution API & Alertas WhatsApp
-                    </h3>
-                    <p style={{ fontSize: '0.88rem', color: '#64748b' }}>
-                      Envio de comprovantes PDF e avisos automáticos de produção via WhatsApp.
-                    </p>
+                  <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#334155' }}>
+                    💡 <strong>Como vincular o Mercado Pago:</strong> Acesse seu painel no <a href="https://www.mercadopago.com.br/developers" target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>Mercado Pago Developers</a> e copie as chaves da sua aplicação.
+                  </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>API Endpoint URL</label>
-                        <input type="text" value={evoUrl} onChange={e => setEvoUrl(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }} />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>API Key</label>
-                        <input type="password" value={evoKey} onChange={e => setEvoKey(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }} />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>Nome da Instância</label>
-                        <input type="text" value={evoInstance} onChange={e => setEvoInstance(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }} />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>WhatsApp do Admin/Produção (para Alerta de Novos Pedidos)</label>
-                        <input type="text" value={adminPhone} onChange={e => setAdminPhone(e.target.value)} placeholder="Ex: 83999887766" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }} />
-                      </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>
+                        Mercado Pago Access Token *
+                      </label>
+                      <input
+                        type="password"
+                        value={mpAccessToken}
+                        onChange={e => setMpAccessToken(e.target.value)}
+                        disabled={!isEditingMp}
+                        placeholder="APP_USR-xxxxxxxxx..."
+                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', background: !isEditingMp ? '#f1f5f9' : '#ffffff' }}
+                        required
+                      />
                     </div>
 
                     <div>
-                      <a href={`${evoUrl}/manager`} target="_blank" rel="noreferrer" className="btn btn-secondary" style={{ display: 'inline-flex', fontSize: '0.88rem' }}>
-                        <ExternalLink size={16} /> Abrir Evolution Manager (Conectar QR Code WhatsApp)
-                      </a>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>
+                        Mercado Pago Public Key
+                      </label>
+                      <input
+                        type="text"
+                        value={mpPublicKey}
+                        onChange={e => setMpPublicKey(e.target.value)}
+                        disabled={!isEditingMp}
+                        placeholder="APP_USR-xxxxxxxxx..."
+                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', background: !isEditingMp ? '#f1f5f9' : '#ffffff' }}
+                      />
                     </div>
-                  </div>
 
-                  {/* Seção C: Modo 24h & Operação */}
-                  <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--secondary-light)', border: '1px solid #bcecf0', flexWrap: 'wrap', gap: '16px' }}>
                     <div>
-                      <h4 style={{ fontSize: '1.1rem', color: '#0e5864', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Zap size={20} color="var(--primary)" /> Modo 24h (Entrega Expressa Noturna)
-                      </h4>
-                      <p style={{ fontSize: '0.88rem', color: '#173440', marginTop: '4px', maxWidth: '650px' }}>
-                        Quando ATIVO: Oculta personalização no e-commerce e foca apenas nos produtos prontos do catálogo para postagem expressa.
-                      </p>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>
+                        Mercado Pago Webhook Secret (Notificação Pix)
+                      </label>
+                      <input
+                        type="password"
+                        value={mpWebhookSecret}
+                        onChange={e => setMpWebhookSecret(e.target.value)}
+                        disabled={!isEditingMp}
+                        placeholder="Secret do Webhook de confirmação Pix"
+                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', background: !isEditingMp ? '#f1f5f9' : '#ffffff' }}
+                      />
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleToggleModo24h}
-                      className={`btn ${modo24h ? 'btn-primary' : 'btn-outline'}`}
-                      style={{ padding: '10px 20px', fontSize: '0.9rem' }}
-                    >
-                      {modo24h ? '⚡ MODO 24h ATIVO' : 'MODO PADRÃO'}
-                    </button>
                   </div>
 
-                  <div>
-                    <button type="submit" className="btn btn-primary" style={{ padding: '12px 24px', fontSize: '1rem' }}>
-                      Salvar Todas as Configurações de Integração
-                    </button>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    {!isEditingMp ? (
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => setIsEditingMp(true)}
+                        style={{ padding: '10px 20px', fontSize: '0.9rem' }}
+                      >
+                        <Edit2 size={16} /> 🔓 Editar Credenciais do Mercado Pago
+                      </button>
+                    ) : (
+                      <>
+                        <button type="submit" className="btn btn-primary" style={{ padding: '10px 20px', fontSize: '0.9rem' }}>
+                          <Save size={16} /> 💾 Salvar Mercado Pago no Banco
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={() => { setIsEditingMp(false); fetchAdminConfig(); }}
+                          style={{ padding: '10px 16px', fontSize: '0.9rem' }}
+                        >
+                          Cancelar
+                        </button>
+                      </>
+                    )}
                   </div>
                 </form>
 
-                {/* Seção de Limpeza / Reset para Teste Real */}
-                <div className="card" style={{ border: '1px solid #fca5a5', background: '#fff5f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                {/* Seção B: Evolution API (WhatsApp Notifications & Status Badge) */}
+                <form onSubmit={handleSaveEvolutionConfig} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                    <div>
+                      <h3 style={{ fontSize: '1.2rem', color: 'var(--primary)', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <MessageSquare size={22} color="var(--primary)" /> Integração Evolution API & Alertas WhatsApp
+                        {!isEditingEvo && (
+                          <span className="badge badge-green" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>
+                            🔒 Configurações Salvas & Protegidas
+                          </span>
+                        )}
+                      </h3>
+                      <p style={{ fontSize: '0.88rem', color: '#64748b', marginTop: '2px' }}>
+                        Envio de comprovantes PDF e avisos automáticos de produção via WhatsApp.
+                      </p>
+                    </div>
+
+                    {/* Badge de Status do WhatsApp DENTRO do Card */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className={`badge ${waStatus.connected ? 'badge-green' : 'badge-gold'}`} style={{ padding: '6px 12px', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                        {waStatus.loading ? '⏳ Verificando Status...' : waStatus.connected ? '🟢 WhatsApp Conectado (Online)' : '🔴 WhatsApp Desconectado (Requer QR Code)'}
+                      </span>
+                      <button type="button" onClick={fetchWaStatus} className="btn btn-outline" style={{ padding: '6px 10px', fontSize: '0.78rem' }} title="Atualizar Status">
+                        <RefreshCw size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>API Endpoint URL</label>
+                      <input type="text" value={evoUrl} onChange={e => setEvoUrl(e.target.value)} disabled={!isEditingEvo} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', background: !isEditingEvo ? '#f1f5f9' : '#ffffff' }} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>API Key</label>
+                      <input type="password" value={evoKey} onChange={e => setEvoKey(e.target.value)} disabled={!isEditingEvo} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', background: !isEditingEvo ? '#f1f5f9' : '#ffffff' }} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>Nome da Instância</label>
+                      <input type="text" value={evoInstance} onChange={e => setEvoInstance(e.target.value)} disabled={!isEditingEvo} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', background: !isEditingEvo ? '#f1f5f9' : '#ffffff' }} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>WhatsApp do Admin/Produção (para Alerta de Novos Pedidos)</label>
+                      <input type="text" value={adminPhone} onChange={e => setAdminPhone(e.target.value)} disabled={!isEditingEvo} placeholder="Ex: 83999887766" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', background: !isEditingEvo ? '#f1f5f9' : '#ffffff' }} />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {!isEditingEvo ? (
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => setIsEditingEvo(true)}
+                        style={{ padding: '10px 20px', fontSize: '0.9rem' }}
+                      >
+                        <Edit2 size={16} /> 🔓 Editar Configurações do WhatsApp
+                      </button>
+                    ) : (
+                      <>
+                        <button type="submit" className="btn btn-primary" style={{ padding: '10px 20px', fontSize: '0.9rem' }}>
+                          <Save size={16} /> 💾 Salvar WhatsApp no Banco
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={() => { setIsEditingEvo(false); fetchAdminConfig(); }}
+                          style={{ padding: '10px 16px', fontSize: '0.9rem' }}
+                        >
+                          Cancelar
+                        </button>
+                      </>
+                    )}
+                    <a href={`${evoUrl}/manager`} target="_blank" rel="noreferrer" className="btn btn-secondary" style={{ display: 'inline-flex', fontSize: '0.88rem' }}>
+                      <ExternalLink size={16} /> Abrir Evolution Manager (Conectar QR Code WhatsApp)
+                    </a>
+                  </div>
+                </form>
+
+                {/* Seção C: Modo 24h & Operação */}
+                <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--secondary-light)', border: '1px solid #bcecf0', flexWrap: 'wrap', gap: '16px' }}>
                   <div>
-                    <h4 style={{ fontSize: '1rem', color: '#991b1b', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Trash2 size={18} color="#991b1b" /> Limpar Dados de Exemplo (Reset de Teste Real)
+                    <h4 style={{ fontSize: '1.1rem', color: '#0e5864', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Zap size={20} color="var(--primary)" /> Modo 24h (Entrega Expressa Noturna)
                     </h4>
-                    <p style={{ fontSize: '0.85rem', color: '#7f1d1d', marginTop: '4px' }}>
-                      Remove pedidos, clientes e ordens de teste para que você possa cadastrar dados reais e testar a integração completa.
+                    <p style={{ fontSize: '0.88rem', color: '#173440', marginTop: '4px', maxWidth: '650px' }}>
+                      Quando ATIVO: Oculta personalização no e-commerce e foca apenas nos produtos prontos do catálogo para postagem expressa.
                     </p>
                   </div>
                   <button
                     type="button"
-                    className="btn"
-                    onClick={handleResetDemoData}
-                    style={{ background: '#dc2626', color: '#ffffff', padding: '10px 18px', fontSize: '0.88rem' }}
+                    onClick={handleToggleModo24h}
+                    className={`btn ${modo24h ? 'btn-primary' : 'btn-outline'}`}
+                    style={{ padding: '10px 20px', fontSize: '0.9rem' }}
                   >
-                    Limpar Dados de Teste
+                    {modo24h ? '⚡ MODO 24h ATIVO' : 'MODO PADRÃO'}
                   </button>
                 </div>
 
               </div>
             )}
+
 
           </div>
         </main>

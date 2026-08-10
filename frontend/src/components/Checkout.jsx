@@ -3,7 +3,24 @@ import { X, CheckCircle, CreditCard, QrCode, Trash2, ArrowRight, Clock } from 'l
 
 export default function Checkout({ cart, isEventoMode, isOpen, onClose, onClearCart }) {
   const [step, setStep] = useState('cart'); // 'cart' | 'customer' | 'success'
-  const [customer, setCustomer] = useState({ name: '', email: '', phone: '' });
+  const [customer, setCustomer] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    cpf: '',
+    street: '',
+    number: '',
+    complement: '',
+    neighborhood: '',
+    city: 'João Pessoa',
+    state: 'PB',
+    zip_code: ''
+  });
+  const [searchPhone, setSearchPhone] = useState('');
+  const [searchingCustomer, setSearchingCustomer] = useState(false);
+  const [lookupFound, setLookupFound] = useState(false);
+  const [lookupMsg, setLookupMsg] = useState('');
+
   const [paymentMethod, setPaymentMethod] = useState('pix');
   const [orderResult, setOrderResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -12,6 +29,45 @@ export default function Checkout({ cart, isEventoMode, isOpen, onClose, onClearC
 
   const totalCartAmount = cart.reduce((acc, item) => acc + item.total_price, 0);
   const deliveryDeadline = isEventoMode ? '24 horas' : '5 dias úteis';
+
+  async function handleLookupCustomer() {
+    if (!searchPhone || searchPhone.trim().length < 8) {
+      alert('Por favor digite um número de WhatsApp válido.');
+      return;
+    }
+    setSearchingCustomer(true);
+    setLookupMsg('');
+    try {
+      const res = await fetch(`/api/customers/lookup?phone=${encodeURIComponent(searchPhone)}`);
+      const data = await res.json();
+      if (res.ok && data.found && data.customer) {
+        const c = data.customer;
+        setCustomer({
+          name: c.name || '',
+          email: customer.email || '',
+          phone: c.phone || searchPhone,
+          cpf: c.cpf || '',
+          street: c.street || '',
+          number: c.number || '',
+          complement: c.complement || '',
+          neighborhood: c.neighborhood || '',
+          city: c.city || 'João Pessoa',
+          state: c.state || 'PB',
+          zip_code: c.zip_code || ''
+        });
+        setLookupFound(true);
+        setLookupMsg(`✨ Olá, ${c.name}! Seus dados de entrega foram carregados.`);
+      } else {
+        setCustomer(prev => ({ ...prev, phone: searchPhone }));
+        setLookupFound(false);
+        setLookupMsg('👋 Seja bem-vindo! Nenhum cadastro prévio encontrado. Preencha seus dados abaixo:');
+      }
+    } catch (err) {
+      setLookupMsg('Erro ao consultar cadastro. Preencha seus dados manualmente abaixo.');
+    } finally {
+      setSearchingCustomer(false);
+    }
+  }
 
   async function handleFinishOrder(e) {
     e.preventDefault();
@@ -26,6 +82,14 @@ export default function Checkout({ cart, isEventoMode, isOpen, onClose, onClearC
         customer_name: customer.name,
         customer_email: customer.email,
         customer_phone: customer.phone,
+        cpf: customer.cpf,
+        street: customer.street,
+        number: customer.number,
+        complement: customer.complement,
+        neighborhood: customer.neighborhood,
+        city: customer.city,
+        state: customer.state,
+        zip_code: customer.zip_code,
         payment_method: paymentMethod,
         delivery_deadline: deliveryDeadline,
         items: cart
@@ -79,7 +143,7 @@ export default function Checkout({ cart, isEventoMode, isOpen, onClose, onClearC
           </button>
         </div>
 
-        {/* Informador de Prazo de Entrega (RN-05 & RN-08) */}
+        {/* Informador de Prazo de Entrega */}
         <div style={{
           background: isEventoMode ? 'var(--secondary-light)' : '#f8fafc',
           border: '1px solid #cee4e8',
@@ -152,28 +216,110 @@ export default function Checkout({ cart, isEventoMode, isOpen, onClose, onClearC
         {/* Passo 2: Formulário do Cliente e Pagamento */}
         {step === 'customer' && (
           <form onSubmit={handleFinishOrder}>
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontWeight: '600', fontSize: '0.9rem', marginBottom: '6px' }}>Seu Nome Completo *</label>
-              <input
-                type="text"
-                required
-                value={customer.name}
-                onChange={e => setCustomer({ ...customer, name: e.target.value })}
-                placeholder="Ex: Juliao Silva"
-                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
-              />
+            
+            {/* Caixa de Busca Rápida por WhatsApp (Sugestão 1) */}
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '14px', borderRadius: '10px', marginBottom: '18px' }}>
+              <label style={{ display: 'block', fontWeight: '700', fontSize: '0.88rem', color: '#166534', marginBottom: '6px' }}>
+                📱 Já comprou conosco? Digite seu WhatsApp para carregar seus dados:
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="tel"
+                  value={searchPhone}
+                  onChange={e => setSearchPhone(e.target.value)}
+                  placeholder="(83) 99999-9999"
+                  style={{ flex: 1, padding: '8px 12px', borderRadius: '6px', border: '1px solid #86efac', fontSize: '0.9rem' }}
+                />
+                <button
+                  type="button"
+                  onClick={handleLookupCustomer}
+                  disabled={searchingCustomer}
+                  className="btn btn-secondary"
+                  style={{ padding: '8px 14px', fontSize: '0.85rem' }}
+                >
+                  {searchingCustomer ? 'Buscando...' : '🔍 Buscar Meus Dados'}
+                </button>
+              </div>
+              {lookupMsg && (
+                <div style={{ fontSize: '0.8rem', marginTop: '6px', fontWeight: 'bold', color: lookupFound ? '#15803d' : '#b45309' }}>
+                  {lookupMsg}
+                </div>
+              )}
             </div>
 
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontWeight: '600', fontSize: '0.9rem', marginBottom: '6px' }}>Celular com WhatsApp *</label>
-              <input
-                type="tel"
-                required
-                value={customer.phone}
-                onChange={e => setCustomer({ ...customer, phone: e.target.value })}
-                placeholder="(11) 99999-9999"
-                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
-              />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: '4px' }}>Seu Nome Completo *</label>
+                <input
+                  type="text"
+                  required
+                  value={customer.name}
+                  onChange={e => setCustomer({ ...customer, name: e.target.value })}
+                  placeholder="Ex: Maria Silva"
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: '4px' }}>Celular com WhatsApp *</label>
+                <input
+                  type="tel"
+                  required
+                  value={customer.phone}
+                  onChange={e => setCustomer({ ...customer, phone: e.target.value })}
+                  placeholder="(83) 99999-9999"
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px', marginBottom: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: '4px' }}>Rua / Endereço *</label>
+                <input
+                  type="text"
+                  required
+                  value={customer.street}
+                  onChange={e => setCustomer({ ...customer, street: e.target.value })}
+                  placeholder="Rua das Flores"
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: '4px' }}>Número *</label>
+                <input
+                  type="text"
+                  required
+                  value={customer.number}
+                  onChange={e => setCustomer({ ...customer, number: e.target.value })}
+                  placeholder="123"
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: '4px' }}>Bairro *</label>
+                <input
+                  type="text"
+                  required
+                  value={customer.neighborhood}
+                  onChange={e => setCustomer({ ...customer, neighborhood: e.target.value })}
+                  placeholder="Centro"
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: '4px' }}>Cidade *</label>
+                <input
+                  type="text"
+                  required
+                  value={customer.city}
+                  onChange={e => setCustomer({ ...customer, city: e.target.value })}
+                  placeholder="João Pessoa"
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
+                />
+              </div>
             </div>
 
             <div style={{ marginBottom: '20px' }}>
@@ -201,6 +347,7 @@ export default function Checkout({ cart, isEventoMode, isOpen, onClose, onClearC
             </button>
           </form>
         )}
+
 
         {/* Passo 3: Confirmação e Pix */}
         {step === 'success' && orderResult && (

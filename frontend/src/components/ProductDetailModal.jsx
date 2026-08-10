@@ -5,13 +5,18 @@ import BottonMockupDisplay from './BottonMockupDisplay';
 export default function ProductDetailModal({ product, isOpen, onClose, onAddToCart, onCustomizeClick, isModo24h }) {
   if (!isOpen || !product) return null;
 
-  const [diameter, setDiameter] = useState('38mm');
-  const [finishType, setFinishType] = useState('alfinete');
+  const allowedDiameters = Array.isArray(product.allowed_diameters) && product.allowed_diameters.length > 0 
+    ? product.allowed_diameters 
+    : ['38mm', '25mm'];
+  const initialFinish = product.finish_type || 'alfinete';
+
+  const [diameter, setDiameter] = useState(allowedDiameters[0] || '38mm');
+  const [finishType, setFinishType] = useState(initialFinish);
   const [quantity, setQuantity] = useState(1);
 
   // Localizar a variação exata correspondente (Diâmetro x Acabamento)
   const matchedVar = Array.isArray(product.variations) ? product.variations.find(
-    v => v.diameter === diameter && v.finish_type === finishType
+    v => v.diameter === diameter && (v.finish_type === finishType || !v.finish_type)
   ) : null;
 
   const unitPrice = matchedVar && matchedVar.price_override ? parseFloat(matchedVar.price_override) : parseFloat(product.base_price || 5.00);
@@ -78,7 +83,10 @@ export default function ProductDetailModal({ product, isOpen, onClose, onAddToCa
                   src={product.image_url}
                   alt={product.name}
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=500&auto=format&fit=crop&q=60'; }}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23e2e8f0'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' fill='%2364748b'%3ESem Imagem%3C/text%3E%3C/svg%3E";
+                  }}
                 />
               </div>
             )}
@@ -99,49 +107,51 @@ export default function ProductDetailModal({ product, isOpen, onClose, onAddToCa
                 {product.description}
               </p>
 
-              {/* Opções de Diâmetro */}
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>
-                  Diâmetro do Botton:
-                </label>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  {['25mm', '38mm'].map(size => (
-                    <button
-                      key={size}
-                      type="button"
-                      className={`btn ${diameter === size ? 'btn-primary' : 'btn-outline'}`}
-                      onClick={() => setDiameter(size)}
-                      style={{ padding: '8px 16px', fontSize: '0.85rem' }}
-                    >
-                      {diameter === size && <Check size={14} />} {size} {size === '25mm' ? '(Pequeno)' : '(Padrão)'}
-                    </button>
-                  ))}
+              {/* Acabamento Verso */}
+              {isBottonCategory && (
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>
+                    Acabamento do Verso:
+                  </label>
+                  <span className="badge badge-primary" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
+                    {finishType === 'chaveiro' ? '🔑 Chaveiro 2 Faces' : finishType === 'ima' ? '🧲 Ímã de Geladeira' : '🧷 Alfinete de Metal'}
+                  </span>
                 </div>
-              </div>
+              )}
 
-              {/* Opções de Acabamento */}
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>
-                  Acabamento Verso:
-                </label>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  {[
-                    { id: 'alfinete', label: 'Alfinete' },
-                    { id: 'chaveiro', label: 'Chaveiro' },
-                    { id: 'ima', label: 'Ímã de Geladeira' }
-                  ].map(finish => (
-                    <button
-                      key={finish.id}
-                      type="button"
-                      className={`btn ${finishType === finish.id ? 'btn-primary' : 'btn-outline'}`}
-                      onClick={() => setFinishType(finish.id)}
-                      style={{ padding: '6px 12px', fontSize: '0.8rem' }}
-                    >
-                      {finishType === finish.id && <Check size={12} />} {finish.label}
-                    </button>
-                  ))}
+              {/* Opções de Diâmetro (Condicional para Bottons - RN-07) */}
+              {isBottonCategory && (
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '6px' }}>
+                    Tamanho Disponível:
+                  </label>
+                  {allowedDiameters.length === 1 ? (
+                    <span className="badge badge-gold" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
+                      {allowedDiameters[0]} {allowedDiameters[0] === '25mm' ? '(Pequeno)' : '(Padrão)'}
+                    </span>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      {allowedDiameters.map(size => {
+                        const sizeVar = Array.isArray(product.variations) ? product.variations.find(v => v.diameter === size) : null;
+                        const isOutOfStock = sizeVar && parseInt(sizeVar.stock_quantity || 0) <= 0;
+                        return (
+                          <button
+                            key={size}
+                            type="button"
+                            className={`btn ${diameter === size ? 'btn-primary' : 'btn-outline'}`}
+                            onClick={() => !isOutOfStock && setDiameter(size)}
+                            disabled={isOutOfStock}
+                            style={{ padding: '8px 16px', fontSize: '0.85rem', opacity: isOutOfStock ? 0.5 : 1 }}
+                          >
+                            {diameter === size && <Check size={14} />} {size} {size === '25mm' ? '(Pequeno)' : '(Padrão)'} {isOutOfStock ? '(Esgotado)' : ''}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
+
 
               {/* Seleção de Quantidade */}
               <div style={{ marginBottom: '20px' }}>

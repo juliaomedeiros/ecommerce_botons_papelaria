@@ -39,6 +39,7 @@ app.post('/api/auth/login', authController.login);
 app.get('/api/categories', productController.getCategories);
 app.get('/api/products', productController.getProducts);
 app.post('/api/orders', orderController.createOrder);
+app.get('/api/customers/lookup', customerController.lookupCustomerByPhone);
 
 // Webhook Mercado Pago
 app.post('/api/webhooks/mercadopago', webhookController.handleMercadoPagoWebhook);
@@ -66,8 +67,12 @@ app.post('/api/admin/upload-product-image', verifyToken, requireRole(['admin', '
   return res.json({ imageUrl, message: 'Imagem do produto enviada com sucesso!' });
 });
 
+// Status do WhatsApp / Evolution API
+app.get('/api/admin/whatsapp/status', verifyToken, requireRole(['admin', 'funcionario']), configController.getWhatsappStatus);
+
 // Métricas do Dashboard (Admin/Funcionário)
 app.get('/api/admin/dashboard-stats', verifyToken, requireRole(['admin', 'funcionario']), orderController.getDashboardStats);
+
 
 // Rotas Protegidas de Administração (Admin e Funcionário)
 app.get('/api/admin/customers', verifyToken, requireRole(['admin', 'funcionario']), customerController.getCustomers);
@@ -88,6 +93,7 @@ app.post('/api/admin/users', verifyToken, requireRole(['admin']), authController
 app.delete('/api/admin/users/:id', verifyToken, requireRole(['admin']), authController.deleteAdminUser);
 
 // Rota de Configurações Sensíveis & Reset de Dados de Teste (Exclusivas de Admin)
+app.get('/api/admin/config', verifyToken, requireRole(['admin']), configController.getAdminConfig);
 app.post('/api/admin/config', verifyToken, requireRole(['admin']), configController.updateConfig);
 app.post('/api/admin/reset-demo-data', verifyToken, requireRole(['admin']), configController.resetDemoData);
 

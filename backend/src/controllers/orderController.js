@@ -109,10 +109,47 @@ async function createOrder(req, res) {
       `, [pi.id, pi.order_id, pi.product_id, pi.variation_id, pi.diameter, pi.finish_type, pi.image_source, pi.original_image_url, pi.cropped_image_url, pi.crop_data, pi.quantity, pi.unit_price, pi.total_price]);
     }
 
+    // Upsert automático na tabela de clientes compradores
+    if (customer_name && customer_phone) {
+      try {
+        const cleanPhone = customer_phone.replace(/\D/g, '');
+        if (cleanPhone) {
+          const custId = `cust-${Date.now()}`;
+          const { street, number, complement, neighborhood, city, state, zip_code, cpf } = req.body;
+          await db.query(`
+            INSERT INTO customers (id, name, phone, cpf, street, number, complement, neighborhood, city, state, zip_code)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            ON CONFLICT (phone) DO UPDATE SET
+              name = EXCLUDED.name,
+              cpf = COALESCE(EXCLUDED.cpf, customers.cpf),
+              street = COALESCE(EXCLUDED.street, customers.street),
+              number = COALESCE(EXCLUDED.number, customers.number),
+              complement = COALESCE(EXCLUDED.complement, customers.complement),
+              neighborhood = COALESCE(EXCLUDED.neighborhood, customers.neighborhood),
+              city = COALESCE(EXCLUDED.city, customers.city),
+              state = COALESCE(EXCLUDED.state, customers.state),
+              zip_code = COALESCE(EXCLUDED.zip_code, customers.zip_code)
+          `, [
+            custId, customer_name, cleanPhone, cpf || null,
+            street || '', number || '', complement || '', neighborhood || '', city || 'João Pessoa', state || 'PB', zip_code || ''
+          ]);
+        }
+      } catch (custErr) {
+        console.error('Aviso ao registrar/atualizar cliente comprador:', custErr.message);
+      }
+    }
+
     await db.query('COMMIT');
 
-    // Disparo assíncrono do PDF timbrado no WhatsApp informado no checkout
+    // Disparo assíncrono de notificações de WhatsApp (Cliente e Admin)
     try {
+      const summaryList = processedItems.map(i => `- ${i.quantity}x Botton ${i.diameter || ''} ${i.finish_type || ''} (R$ ${i.total_price.toFixed(2)})`).join('\n');
+
+      // 1. Mensagem de Confirmação para o Cliente
+      const clientMsg = `🛍️ *TUTA'S PAPER - Confirmação do Pedido #${orderId.slice(-8)}*\n\nOlá ${customer_name}! Recebemos seu pedido com sucesso e ele já entrou em nossa fila de produção.\n\n*Resumo da Compra:*\n${summaryList}\n\n*Valor Total:* R$ ${totalAmount.toFixed(2)}\n\nAgradecemos a sua preferência!`;
+      whatsappService.sendTextMessage(customer_phone, clientMsg);
+
+      // 2. Disparo do PDF timbrado no WhatsApp do Cliente
       const pdfBuffer = await pdfService.generateOrderPdfBuffer({
         id: orderId,
         customer_name,
@@ -128,18 +165,19 @@ async function createOrder(req, res) {
         customer_phone,
         pdfBuffer,
         `Pedido_TutasPaper_${orderId}.pdf`,
-        `Olá, ${customer_name}! Agradecemos a preferência na Tuta's Paper. Segue em anexo o comprovante timbrado do seu pedido #${orderId.slice(-8)} (Total: R$ ${totalAmount.toFixed(2)}).`
+        `Comprovante timbrado do seu pedido #${orderId.slice(-8)}.`
       );
 
-      // Notificar Admin / Equipe de Produção se houver WhatsApp configurado
+      // 3. Notificar WhatsApp do Admin/Produção (se configurado)
       const adminConfig = await db.query("SELECT value FROM store_config WHERE key = 'admin_phone'");
       if (adminConfig.rows.length > 0 && adminConfig.rows[0].value) {
         const adminPhone = adminConfig.rows[0].value;
-        const adminMsg = `🚨 NOVO PEDIDO RECEBIDO! #${orderId.slice(-8)}\nCliente: ${customer_name} (${customer_phone})\nValor Total: R$ ${totalAmount.toFixed(2)}\nItens: ${processedItems.length} item(ns) disponíveis na Fila Noturna de Impressão!`;
+        const totalItemsQty = processedItems.reduce((acc, curr) => acc + curr.quantity, 0);
+        const adminMsg = `📦 *NOVO PEDIDO RECEBIDO - TUTA'S PAPER*\n\n*Cliente:* ${customer_name}\n*WhatsApp:* ${customer_phone}\n*Quantidade de Itens:* ${totalItemsQty}\n*Resumo:* ${processedItems.map(i => `${i.quantity}x ${i.diameter || ''} ${i.finish_type || ''}`).join(', ')}\n*Valor Total:* R$ ${totalAmount.toFixed(2)}`;
         whatsappService.sendTextMessage(adminPhone, adminMsg);
       }
     } catch (pdfErr) {
-      console.error('Aviso ao gerar/enviar PDF timbrado:', pdfErr.message);
+      console.error('Aviso ao gerar/enviar notificações WhatsApp:', pdfErr.message);
     }
 
     return res.status(201).json({
@@ -183,7 +221,7 @@ async function getProductionQueue(req, res) {
         i.quantity
       FROM orders o
       JOIN order_items i ON o.id = i.order_id
-      ORDER BY o.created_at DESC
+      ORDER BY o.created_at ASC
     `;
     const result = await db.query(queryText);
     return res.json(result.rows);

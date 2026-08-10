@@ -22,19 +22,10 @@ async function getConfig(req, res) {
       });
     }
 
-    if (configMap.modo_evento_24h !== undefined) {
-      localStoreConfig.modo_evento_24h = configMap.modo_evento_24h === 'true';
-    }
-    if (configMap.modo_24h !== undefined) {
-      localStoreConfig.modo_24h = configMap.modo_24h === 'true';
-    }
+    if (configMap.modo_evento_24h !== undefined) localStoreConfig.modo_evento_24h = configMap.modo_evento_24h === 'true';
+    if (configMap.modo_24h !== undefined) localStoreConfig.modo_24h = configMap.modo_24h === 'true';
     if (configMap.mp_environment) localStoreConfig.mp_environment = configMap.mp_environment;
     if (configMap.mp_public_key) localStoreConfig.mp_public_key = configMap.mp_public_key;
-    if (configMap.mercadopago_token) localStoreConfig.mercadopago_token = configMap.mercadopago_token;
-    if (configMap.mp_webhook_secret) localStoreConfig.mp_webhook_secret = configMap.mp_webhook_secret;
-    if (configMap.evolution_api_url) localStoreConfig.evolution_api_url = configMap.evolution_api_url;
-    if (configMap.evolution_api_key) localStoreConfig.evolution_api_key = configMap.evolution_api_key;
-    if (configMap.evolution_instance_name) localStoreConfig.evolution_instance_name = configMap.evolution_instance_name;
 
     const hero_phrase = localStoreConfig.modo_24h
       ? 'Modo Entrega Rápida 24h: Escolha seu botton diretamente no nosso catálogo.'
@@ -46,34 +37,46 @@ async function getConfig(req, res) {
       mp_environment: localStoreConfig.mp_environment,
       hero_phrase: hero_phrase,
       default_delivery_days: 5,
-      mp_public_key: localStoreConfig.mp_public_key,
-      mercadopago_token: localStoreConfig.mercadopago_token,
-      mp_webhook_secret: localStoreConfig.mp_webhook_secret,
-      evolution_api_url: localStoreConfig.evolution_api_url,
-      evolution_api_key: localStoreConfig.evolution_api_key,
-      evolution_instance_name: localStoreConfig.evolution_instance_name,
-      evolution_manager_url: `${localStoreConfig.evolution_api_url}/manager`
+      mp_public_key: localStoreConfig.mp_public_key
     });
   } catch (error) {
-    console.error('Aviso ao consultar banco para config, usando fallback local:', error.message);
-    const hero_phrase = localStoreConfig.modo_24h
-      ? 'Modo Entrega Rápida 24h: Escolha seu botton diretamente no nosso catálogo.'
-      : 'Escolha seu botton no catálogo ou personalize um modelo exclusivo com a sua imagem.';
-
     return res.json({
       modo_evento_24h: localStoreConfig.modo_evento_24h,
       modo_24h: localStoreConfig.modo_24h,
       mp_environment: localStoreConfig.mp_environment,
-      hero_phrase: hero_phrase,
+      hero_phrase: 'Escolha seu botton no catálogo ou personalize um modelo exclusivo com a sua imagem.',
       default_delivery_days: 5,
-      mp_public_key: localStoreConfig.mp_public_key,
-      mercadopago_token: localStoreConfig.mercadopago_token,
-      mp_webhook_secret: localStoreConfig.mp_webhook_secret,
-      evolution_api_url: localStoreConfig.evolution_api_url,
-      evolution_api_key: localStoreConfig.evolution_api_key,
-      evolution_instance_name: localStoreConfig.evolution_instance_name,
-      evolution_manager_url: `${localStoreConfig.evolution_api_url}/manager`
+      mp_public_key: localStoreConfig.mp_public_key
     });
+  }
+}
+
+// Obter todas as configurações reais (Exclusivo Admin Protegido)
+async function getAdminConfig(req, res) {
+  try {
+    const result = await db.query("SELECT * FROM store_config");
+    const configMap = {};
+    if (result.rows && result.rows.length > 0) {
+      result.rows.forEach(row => {
+        configMap[row.key] = row.value;
+      });
+    }
+
+    return res.json({
+      modo_evento_24h: configMap.modo_evento_24h === 'true',
+      modo_24h: configMap.modo_24h === 'true',
+      mp_environment: configMap.mp_environment || 'sandbox',
+      mp_public_key: configMap.mp_public_key || '',
+      mercadopago_token: configMap.mercadopago_token || '',
+      mp_webhook_secret: configMap.mp_webhook_secret || '',
+      evolution_api_url: configMap.evolution_api_url || 'http://localhost:8080',
+      evolution_api_key: configMap.evolution_api_key || '',
+      evolution_instance_name: configMap.evolution_instance_name || 'tutaspaper',
+      admin_phone: configMap.admin_phone || ''
+    });
+  } catch (error) {
+    console.error('Erro ao consultar admin store_config:', error);
+    return res.status(500).json({ error: 'Erro ao buscar configurações administrativas.' });
   }
 }
 
@@ -129,6 +132,36 @@ async function updateConfig(req, res) {
   }
 }
 
+async function getWhatsappStatus(req, res) {
+  try {
+    const evoUrl = localStoreConfig.evolution_api_url || process.env.EVOLUTION_API_URL || 'http://localhost:8080';
+    const evoKey = localStoreConfig.evolution_api_key || process.env.EVOLUTION_API_KEY || 'tutas_evolution_key';
+    const evoInstance = localStoreConfig.evolution_instance_name || 'tutaspaper';
+
+    const response = await fetch(`${evoUrl}/instance/all`, {
+      method: 'GET',
+      headers: { 'apikey': evoKey }
+    });
+
+    if (!response.ok) {
+      return res.json({ connected: false, status: 'disconnected', message: 'Evolution API inacessível' });
+    }
+
+    const data = await response.json();
+    const instances = data.data || [];
+    const targetInst = instances.find(i => i.name === evoInstance || i.id === evoInstance);
+
+    if (targetInst && targetInst.connected === true) {
+      return res.json({ connected: true, status: 'connected', instanceName: targetInst.name, message: 'WhatsApp Conectado (Online)' });
+    } else {
+      return res.json({ connected: false, status: 'disconnected', instanceName: evoInstance, message: 'WhatsApp Desconectado' });
+    }
+  } catch (error) {
+    console.error('Erro ao verificar status do WhatsApp:', error.message);
+    return res.json({ connected: false, status: 'disconnected', message: error.message });
+  }
+}
+
 async function resetDemoData(req, res) {
   try {
     // Limpar ordens e itens de demonstração
@@ -144,6 +177,9 @@ async function resetDemoData(req, res) {
 
 module.exports = {
   getConfig,
+  getAdminConfig,
   updateConfig,
+  getWhatsappStatus,
   resetDemoData
 };
+
