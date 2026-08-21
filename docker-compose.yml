@@ -21,7 +21,7 @@ services:
   backend:
     build:
       context: .
-      dockerfile: docker/Dockerfile.backend
+      dockerfile: backend/Dockerfile.backend
     container_name: tutaspaper_backend
     restart: always
     environment:

@@ -42,68 +42,62 @@ Proporcionar uma experiência de compra ágil e encantadora para o cliente — s
 * Pagamento seguro e transparente com **Pix (QR Code / Copia e Cola)** e **Cartão de Crédito**.
 
 ### 🔐 7. Painel Administrativo Completo (`/admin`)
-Acessível direto pelo botão de cadeado no topo do site ou pela URL **`http://localhost/admin`**:
+Acessível direto pelo botão de cadeado no topo da loja ou navegando pela URL **`http://localhost/admin`**:
 * **📅 Fila Noturna de Produção:** Tabela contendo Nome do Cliente, Telefone, Imagem Recortada Redonda, Link para Imagem Original, Prazo Registrado e Botões de Status (*Iniciar Prensa* / *Pronto para Envio*).
 * **🏷️ Gestão de Categorias:** Cadastro e atualização das categorias do catálogo.
-* **⚙️ Painel de Integrações:** Gerenciamento das chaves do Mercado Pago, Evolution API e alternância do Modo Evento.
-
-### 🛡️ 8. Notificações WhatsApp & Mecanismo Anti-Ban (Evolution Go)
-* Integração com o **Evolution Go** (`evoapicloud/evolution-go`), motor de alta performance em Go (Golang) com baixo consumo de memória RAM (~30MB).
-* **Fila FIFO em Memória:** Mensagens enfileiradas sequencialmente sem disparos em rajada.
-* **Simulador de Digitação (`composing`):** Envia o sinal *"Digitando..."* por 2 a 4 segundos antes de cada envio.
-* **Delay Humanizado Aleatório:** Pausas randômicas de **5 a 15 segundos** entre cada mensagem para total segurança contra bloqueios da Meta/WhatsApp.
+* **📦 Gestão de Estoque Central de Insumos:** Controle por par de diâmetro x acabamento (`25mm_alfinete`, `38mm_alfinete`, etc.) sem necessidade de digitação manual de estoque por produto.
+* **📜 Livro Razão de Estoque (`stock_movements`):** Registro imutável de todas as compras de matérias-primas, saídas automáticas por vendas e perdas de prensagem com cálculo financeiro.
+* **⚙️ Painel de Integrações:** Gerenciamento das chaves do Mercado Pago, Evolution API e alternância do Modo Evento 24h.
 
 ---
 
 ## 🛠️ Tecnologias, Bibliotecas & Dependências
 
-Abaixo está o detalhamento completo de todas as tecnologias e bibliotecas utilizadas no ecossistema da aplicação:
-
 ### 💻 Frontend (Interface & Experiência do Usuário)
-* **[React 18.3](https://react.dev/):** Biblioteca JavaScript para construção de interfaces reativas baseadas em componentes.
-* **[React DOM 18.3](https://react.dev/):** Renderizador do React para manipulação no navegador.
-* **[Vite 5.2](https://vitejs.dev/):** Ferramenta de build moderna e bundler de alta performance.
-* **[Lucide React 0.380](https://lucide.dev/):** Conjunto de ícones vetoriais elegantes e leves.
-* **HTML5 Canvas API:** Engine gráfica no navegador para manipulação, zoom (`0.2x-3.0x`), arraste e exportação das prévias redondas em 300DPI (`toDataURL('image/png')`).
-* **Vanilla CSS3 (Design System Customizado):** Utilização das variáveis de cor oficiais (`#173440` e `#3fb9c8`), efeito Glassmorphism, badges responsivos e animações fluidas.
+* **[Vue 3 (Composition API)](https://vuejs.org/):** Framework progressivo de altíssima performance para interfaces reativas.
+* **[Vite 5.2](https://vitejs.dev/):** Ferramenta de build de última geração com HMR instantâneo.
+* **[Tailwind CSS v3](https://tailwindcss.com/):** Framework CSS utilitário para design responsivo, elegante e leve (redução de 64% no bundle JS/CSS).
+* **[Pinia 2.1](https://pinia.vuejs.org/):** Gerenciador de estado oficial e previsível do Vue.
+* **[Vue Router 4.3](https://router.vuejs.org/):** Roteamento SPA desacoplado para `/` (Loja) e `/admin` (Painel Administrativo).
+* **[Lucide Vue Next](https://lucide.dev/):** Ícones vetoriais modernos e performáticos.
+* **HTML5 Canvas API:** Engine gráfica nativa no navegador para ajuste, zoom e exportação circular em 300DPI (`toDataURL('image/png')`).
 
-### ⚙️ Backend (API REST & Regras de Negócio)
-* **[Node.js 18](https://nodejs.org/):** Ambiente de execução JavaScript no servidor.
-* **[Express 4.19](https://expressjs.com/):** Framework web minimalista para construção de endpoints RESTful e middlewares.
-* **[pg 8.11 (PostgreSQL Client)](https://node-postgres.com/):** Driver oficial para comunicação e queries assíncronas com o PostgreSQL.
-* **[jsonwebtoken 9.0 (JWT)](https://jwt.io/):** Geração e validação de tokens cifrados para autenticação segura do Painel Admin (expiração de 24h).
-* **[bcryptjs 2.4](https://github.com/dcodeIO/bcrypt.js):** Criptografia de via única (hash salted) para armazenar senhas de acesso do administrador com segurança.
-* **[multer 1.4](https://github.com/expressjs/multer):** Middleware para gerenciamento de uploads de imagens multipart/form-data.
-* **[cors 2.8](https://github.com/expressjs/cors):** Controle de políticas de compartilhamento de recursos entre origens (CORS).
-* **[canvas 2.11 (Node-Canvas)](https://github.com/Automattic/node-canvas):** Biblioteca nativa baseada em Cairo e Pango para manipulação server-side de gráficos e imagens.
-* **[dotenv 16.4](https://github.com/motdotla/dotenv):** Carregador de variáveis de ambiente para configuração isolada da aplicação.
+### ⚙️ Backend (API RESTful de Alta Performance)
+* **[Python 3.12](https://www.python.org/):** Linguagem de programação moderna, concisa e de alto nível.
+* **[FastAPI 0.111](https://fastapi.tiangolo.com/):** Framework web assíncrono moderno com suporte nativo a **Pydantic v2** e OpenAPI/Swagger automático.
+* **[Uvicorn 0.30](https://www.uvicorn.org/):** Servidor ASGI assíncrono de altíssima velocidade para produção.
+* **[SQLAlchemy 2.0 Async](https://www.sqlalchemy.org/):** ORM assíncrono robusto alimentado pelo driver **`asyncpg`**.
+* **[PyJWT & Passlib (Bcrypt)](https://pyjwt.readthedocs.io/):** Autenticação JWT segura com salted password hashing para os administradores.
 
 ### 📱 Engine de WhatsApp & Banco de Dados
-* **[Evolution Go (evoapicloud/evolution-go)](https://github.com/evolution-foundation/evolution-go):** Motor de comunicação com o WhatsApp reescrito em **Golang (Go)** com consumo de RAM ~30MB, suporte a presença `composing` e gerenciador visual via QR Code.
-* **[PostgreSQL 16 (Alpine)](https://www.postgresql.org/):** Banco de dados relacional robusto para armazenamento de pedidos, itens, variações, usuários admin e a tabela de configurações `store_config`.
-
-### 🐳 Infraestrutura & DevOps
-* **[Docker & Docker Compose 3.8](https://www.docker.com/):** Conteinerização e orquestração de 4 contêineres (`frontend`, `backend`, `postgres` e `evolution_go`) executáveis via 1 único comando.
-* **[Nginx (Alpine)](https://nginx.org/):** Servidor web de alta performance com suporte a **SPA Fallback Routing** (`try_files $uri $uri/ /index.html`), permitindo navegação direta em rotas como `/admin`.
+* **[Evolution Go (evoapicloud/evolution-go)](https://github.com/evolution-foundation/evolution-go):** Engine de WhatsApp reescrita em Golang (~30MB RAM) com simulação de digitação e delay humanizado anti-ban.
+* **[PostgreSQL 16](https://www.postgresql.org/):** Banco de dados relacional que armazena os produtos, insumos físicos e o **Livro Razão (`stock_movements`)**.
 
 ---
 
-## 🚀 Como Executar o Projeto
+## 🚀 Como Executar o Projeto & Endereços de Acesso
 
 Toda a infraestrutura do projeto roda em contêineres Docker com um único comando:
 
-### 1. Clonar o repositório e rodar o Docker:
+### 1. Executar no Docker:
 ```bash
 docker compose up -d --build
 ```
 
-### 2. Endereços de Acesso:
+### 2. Mapeamento Completo de Portas e URLs:
 
-| Serviço | URL | Descrição |
-|---------|-----|-----------|
-| 🛒 **E-commerce público** | `http://localhost` | Loja virtual e personalizador público |
-| 🔐 **Painel Admin Direto** | `http://localhost/admin` | Painel de controle da empresa |
-| 📱 **Evolution Go Manager** | `http://localhost:8080/manager` | Painel de conexão do WhatsApp via QR Code |
+| Serviço | Porta | URL de Acesso | Descrição |
+|---------|-------|---------------|-----------|
+| 🛒 **E-commerce público** | `80` | `http://localhost` | Vitrine pública em Vue 3 + Tailwind CSS |
+| 🔐 **Painel Admin Direto** | `80` | `http://localhost/admin` | Painel de controle em Vue 3 + Pinia |
+| 📄 **Documentação Swagger API** | `5000` | `http://localhost:5000/docs` | Swagger UI interativo do FastAPI |
+| ⚙️ **Backend REST API** | `5000` | `http://localhost:5000/api/health` | API Python 3.12 / FastAPI 0.111 |
+| 📱 **Evolution Go Manager** | `8080` | `http://localhost:8080/manager` | Painel QR Code do WhatsApp |
+| 🐘 **PostgreSQL Database** | `5432` | `localhost:5432` | Banco de dados relacional |
+
+### 🔄 Guia de Navegação Direta na Aplicação:
+- **Para ir da Loja ao Admin:** Clique no ícone de **Cadeado (Acesso Admin)** no cabeçalho ou navegue diretamente para `http://localhost/admin`.
+- **Para ir do Admin à Loja:** Clique no botão **`Voltar ao E-commerce`** no cabeçalho do painel para retornar instantaneamente à vitrine em `http://localhost`.
 
 ### 🔑 Credenciais Padrão do Admin:
 * **E-mail:** `admin@tutaspapeis.com.br`
