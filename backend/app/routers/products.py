@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 import uuid
@@ -13,7 +13,6 @@ async def get_categories(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Category))
     categories = result.scalars().all()
     if not categories:
-        # Categorias padrão se vazio
         default_cats = [
             {"id": "cat_bottons", "name": "Bottons, Chaveiros & Ímãs", "description": "Linha Fast-Food 25mm e 38mm"},
             {"id": "cat_religiosos", "name": "Artigos Religiosos", "description": "Terços, Medalhas e Imagens"},
@@ -21,6 +20,31 @@ async def get_categories(db: AsyncSession = Depends(get_db)):
         ]
         return default_cats
     return [{"id": c.id, "name": c.name, "description": c.description} for c in categories]
+
+@router.post("/admin/categories")
+async def create_category(cat: dict, db: AsyncSession = Depends(get_db)):
+    cat_id = f"cat_{uuid.uuid4().hex[:8]}"
+    category = Category(
+        id=cat_id,
+        name=cat.get("name", "Nova Categoria"),
+        description=cat.get("description", "")
+    )
+    db.add(category)
+    await db.commit()
+    await db.refresh(category)
+    return {"message": "Categoria criada com sucesso!", "category": {"id": category.id, "name": category.name}}
+
+@router.post("/admin/upload-product-image")
+async def upload_product_image(file: UploadFile = File(...)):
+    import os, uuid
+    upload_dir = "/app/uploads"
+    os.makedirs(upload_dir, exist_ok=True)
+    filename = f"prod_{uuid.uuid4().hex[:8]}_{file.filename}"
+    filepath = os.path.join(upload_dir, filename)
+    with open(filepath, "wb") as f:
+        content = await file.read()
+        f.write(content)
+    return {"url": f"/uploads/{filename}"}
 
 @router.get("/products")
 async def get_products(db: AsyncSession = Depends(get_db)):

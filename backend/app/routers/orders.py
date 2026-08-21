@@ -68,6 +68,19 @@ async def create_checkout(req: OrderCreate, db: AsyncSession = Depends(get_db)):
         "qr_code_base64": ""
     }
 
+@router.put("/admin/orders/{order_id}/production-status")
+async def update_production_status(order_id: str, payload: dict, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Order).where(Order.id == order_id))
+    order = result.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado.")
+
+    status_val = payload.get("production_status", "pending")
+    order.production_status = status_val
+    await db.commit()
+    await db.refresh(order)
+    return {"message": f"Status atualizado para {status_val}", "order_id": order_id}
+
 @router.get("/admin/production-queue")
 async def get_production_queue(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Order).order_by(Order.created_at.desc()))

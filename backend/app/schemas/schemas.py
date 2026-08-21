@@ -62,4 +62,8 @@ class StoreConfigSchema(BaseModel):
     modo_evento_24h: Optional[bool] = False
     mp_environment: Optional[str] = "sandbox"
     mp_public_key: Optional[str] = None
+    mercadopago_token: Optional[str] = None
+    evolution_api_url: Optional[str] = "http://localhost:8080"
+    evolution_api_key: Optional[str] = "tutas_evolution_key"
+    admin_phone: Optional[str] = None
     hero_phrase: Optional[str] = None
